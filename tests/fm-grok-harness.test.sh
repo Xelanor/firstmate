@@ -120,7 +120,7 @@ $rec
 EOF
   sub_home="$home/user-home/.grok-sub"
   mkdir -p "$sub_home"
-  out=$(fm_test_run_spawn "$home" "$wt" "$fakebin" \
+  out=$(GROK_HOME="$grok_home" fm_test_run_spawn "$home" "$wt" "$fakebin" \
     "$id" "$proj" --harness grok-sub --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "grok-sub spawn should succeed"$'\n'"$out"

@@ -627,6 +627,16 @@ relaunch_rollback() {
 resolve_relaunch_profile() {
   PRIOR_HARNESS=$HARNESS
   PRIOR_RECORDED_HARNESS=$RECORDED_HARNESS
+  # $HARNESS is the control FAMILY, which is what the interrupt and exit tables
+  # are keyed by. A relaunch instead reproduces the runtime the task actually
+  # ran, so when the recorded value is itself a verified adapter name it stays
+  # the prior harness. grok-sub is the case that differs from its family: it is
+  # the grok CLI on the second Grok home, and folding it to `grok` would move
+  # the task onto the other subscription. A recorded basename that names no
+  # adapter (say `grok-2`) still falls through to the guard below.
+  if fm_control_harness_supported "$PRIOR_RECORDED_HARNESS"; then
+    PRIOR_HARNESS=$PRIOR_RECORDED_HARNESS
+  fi
   PRIOR_MODEL=$(fm_meta_get "$META" model)
   PRIOR_EFFORT=$(fm_meta_get "$META" effort)
   [ -n "$PRIOR_MODEL" ] || PRIOR_MODEL=default

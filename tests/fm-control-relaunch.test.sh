@@ -634,6 +634,25 @@ test_harness_switch_resolves_a_prefixed_recorded_harness() {
   pass "fm-control relaunch: a prefixed recorded harness can switch adapters transactionally"
 }
 
+test_second_pool_harness_relaunches_without_an_explicit_harness() {
+  local dir out rc
+  dir=$(new_case groksub rl33)
+  add_ship_task "$dir" rl33 grok-sub
+  printf 'grok' > "$dir/fake/command"
+  printf 'grok' > "$dir/fake/becomes"
+  mkdir -p "$dir/user-home/.grok-sub"
+
+  out=$(run_control "$dir" rl33 relaunch --note "continue on the second pool"); rc=$?
+  expect_code 0 "$rc" "a bare relaunch of a grok-sub task should succeed"$'\n'"$out"
+  [ "$(meta_field "$dir" rl33 harness)" = grok-sub ] \
+    || fail "a bare relaunch must keep the task on grok-sub, not fold it onto grok"
+  [ "$(meta_field "$dir" rl33 grok_home)" = "$dir/user-home/.grok-sub" ] \
+    || fail "the replacement must run on the second Grok home"
+  assert_contains "$out" "harness=grok-sub from=grok-sub" \
+    "relaunch should report the second pool on both sides of the transition"
+  pass "fm-control relaunch: a grok-sub task relaunches onto its own pool with no --harness"
+}
+
 test_prefixed_recorded_harness_requires_explicit_replacement() {
   local dir out rc meta brief
   dir=$(new_case prefixrefuse rl34)
@@ -1693,6 +1712,7 @@ test_relaunch_requires_a_note_for_a_ship_task
 test_harness_switch_moves_the_record_and_clears_prior_wiring
 test_harness_switch_does_not_carry_the_old_profile_axes
 test_harness_switch_resolves_a_prefixed_recorded_harness
+test_second_pool_harness_relaunches_without_an_explicit_harness
 test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
