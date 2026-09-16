@@ -1,0 +1,47 @@
+=== S1: captain dispatches a crewmate on the second Grok pool ===
+$ fm-spawn.sh news-1 <project> --harness grok-sub --model grok-4 --effort high
+warning: /tmp/groksub-drive.UZMG5E/s1/home/data/news-1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned news-1 harness=grok-sub kind=ship mode=no-mistakes yolo=off window=firstmate:fm-news-1 worktree=/tmp/groksub-drive.UZMG5E/s1/wt
+exit=0
+--- launch command sent to the pane ---
+GROK_HOME='/tmp/groksub-drive.UZMG5E/s1/home/user-home/.grok-sub' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI grok --always-approve --model 'grok-4' --reasoning-effort 'high' "$('/home/berke/.no-mistakes/worktrees/ecf0c8ed7053/01M2MMD0VV0Q6ENMD1760D6Y9A/bin/fm-operational-input.sh' encode launch-brief < '/tmp/groksub-drive.UZMG5E/s1/home/data/news-1/launch-brief.md')"
+--- state/news-1.meta (harness + home axes) ---
+harness=grok-sub
+model=grok-4
+effort=high
+grok_home=/tmp/groksub-drive.UZMG5E/s1/home/user-home/.grok-sub
+--- turn-end hook location ---
+/tmp/groksub-drive.UZMG5E/s1/home/user-home/.grok-sub/hooks/fm-turn-end.sh
+ls: cannot access '/tmp/groksub-drive.UZMG5E/s1/home/grok-home/hooks/fm-turn-end.sh': No such file or directory
+(none under ambient GROK_HOME - correct)
+
+=== S1b: teardown retires the token from the recorded second home ===
+token registered: /tmp/groksub-drive.UZMG5E/s1/home/user-home/.grok-sub/hooks/fm-turn-end.d/fm.Xe4bOekILMQt
+teardown exit=0
+ls: cannot access '/tmp/groksub-drive.UZMG5E/s1/home/user-home/.grok-sub/hooks/fm-turn-end.d/fm.Xe4bOekILMQt': No such file or directory
+(token removed from ~/.grok-sub - correct)
+
+=== S2: default grok is NOT diverted, even with GROK_HOME exported ===
+$ GROK_HOME=<ambient> fm-spawn.sh news-2 <project> --harness grok
+warning: /tmp/groksub-drive.UZMG5E/s2/home/data/news-2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned news-2 harness=grok kind=ship mode=no-mistakes yolo=off window=firstmate:fm-news-2 worktree=/tmp/groksub-drive.UZMG5E/s2/wt
+exit=0
+--- launch command ---
+env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI grok --always-approve "$('/home/berke/.no-mistakes/worktrees/ecf0c8ed7053/01M2MMD0VV0Q6ENMD1760D6Y9A/bin/fm-operational-input.sh' encode launch-brief < '/tmp/groksub-drive.UZMG5E/s2/home/data/news-2/launch-brief.md')"
+--- meta ---
+harness=grok
+(no grok_home recorded - default pool stays ~/.grok)
+
+=== S3 (adversarial): grok-sub as a secondmate is refused ===
+$ fm-spawn.sh sm-1 <secondmate-home> --harness grok-sub --secondmate
+error: grok-sub is a crew-dispatch Grok pool only and cannot run a secondmate; use grok for a secondmate.
+exit=1
+
+=== S4 (adversarial): grok-sub without a configured ~/.grok-sub is refused ===
+$ fm-spawn.sh news-4 <project> --harness grok-sub   # ~/.grok-sub absent
+error: Grok home '/tmp/groksub-drive.UZMG5E/s4/home/user-home/.grok-sub' is not a directory; grok-sub requires an already-configured second Grok home
+exit=1
+--- launch log (must be empty) ---
+[end of launch log]
+
+LAB=/tmp/groksub-drive.UZMG5E

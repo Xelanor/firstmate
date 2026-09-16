@@ -1,0 +1,14 @@
+=== recorded task before relaunch ===
+harness=grok-sub
+(no grok_home yet)
+
+$ fm-control.sh news-7 relaunch --note 'continue on the second pool'   # no --harness given
+warning: /tmp/groksub-relaunch.jksH5R/case/home/data/news-7/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched news-7 harness=grok-sub from=grok-sub model=default effort=default backend=tmux endpoint=fmses:fm-news-7 worktree=/tmp/groksub-relaunch.jksH5R/case/wt
+exit=0
+
+=== recorded task after relaunch ===
+harness=grok-sub
+grok_home=/tmp/groksub-relaunch.jksH5R/case/user-home/.grok-sub
+=== replacement launch command sent to the pane ===
+unset TRACEPARENT; GROK_HOME='/tmp/groksub-relaunch.jksH5R/case/user-home/.grok-sub' env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI grok --always-approve "$('/home/berke/.no-mistakes/worktrees/ecf0c8ed7053/01M2MMD0VV0Q6ENMD1760D6Y9A/bin/fm-operational-input.sh' encode launch-brief < '/tmp/groksub-relaunch.jksH5R/case/home/data/news-7/launch-brief.md')"

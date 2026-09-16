@@ -1,0 +1,27 @@
+$ GROK_HOME=~/.grok quota-axi        # default pool
+  grok,all_products,69,-21.0907,projected_exhaustion,early,credits,"2026-09-23T05:56:57.000Z"
+$ GROK_HOME=~/.grok-sub quota-axi    # second pool
+  grok,all_products,100,1.2149,through_reset,established,credits,"2026-09-22T02:37:21.000Z"
+
+$ bin/fm-quota-choose.sh --snapshot <default-pool-snapshot> --candidate grok:grok-4
+grok grok-4
+exit=0
+
+$ bin/fm-quota-choose.sh --snapshot <second-pool-snapshot> --candidate grok-sub:grok-4
+grok-sub grok-4
+exit=0
+
+$ bin/fm-quota-choose.sh --snapshot <default-pool-snapshot> --candidate grok:grok-4 --candidate grok-sub:grok-4   # collapse attempt
+error: grok and grok-sub are separate Grok subscriptions and quota-axi measures whichever one GROK_HOME selected, so this snapshot describes only one of them; rank them with one call per snapshot instead of naming both here
+exit=2
+$ bin/fm-quota-choose.sh --snapshot <second-pool> --candidate grok-sub:grok-4 --candidate grok:grok-4   # reversed collapse attempt
+error: grok and grok-sub are separate Grok subscriptions and quota-axi measures whichever one GROK_HOME selected, so this snapshot describes only one of them; rank them with one call per snapshot instead of naming both here
+exit=2
+
+# adversarial: pretend the default pool is dry; the second pool must still be dispatchable
+$ bin/fm-quota-choose.sh --snapshot <dry-default-pool> --candidate grok:grok-4
+none
+exit=1
+$ bin/fm-quota-choose.sh --snapshot <second-pool> --candidate grok-sub:grok-4
+grok-sub grok-4
+exit=0
