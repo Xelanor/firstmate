@@ -28,3 +28,17 @@ jq -r '.operations[][][], .harnesses[]' "$ROUTING_JSON" | sort -u | while IFS= r
     || fail "harness adapter routing target is unreadable: $path"
 done
 pass "harness adapter routing artifact is normalized and every target is readable"
+
+# The router is what an agent consults for recovery and control on a task whose
+# state/<id>.meta records that harness, so every routed name must be one the
+# control plane itself accepts.
+# shellcheck source=/dev/null
+. "$ROOT/bin/fm-control-lib.sh"
+while IFS= read -r harness; do
+  [ -n "$harness" ] || continue
+  fm_control_harness_supported "$harness" \
+    || fail "harness adapter routing lists '$harness', which fm-control refuses as unverified"
+done <<EOF
+$(jq -r '.harnesses | keys[]' "$ROUTING_JSON")
+EOF
+pass "every routed harness is one the control plane accepts"
