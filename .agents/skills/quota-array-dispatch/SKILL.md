@@ -38,7 +38,7 @@ Firstmate can optionally arm `bin/fm-procevent-quota.sh` for a recurring mid-tas
 ## Read the default TOON
 
 Start each intake by running `quota-axi` once with no `--json`, and reuse that TOON for every candidate except `grok-sub`.
-`grok-sub` is a second Grok Heavy pool at `GROK_HOME=~/.grok-sub` (or the per-spawn `--grok-home` that names that pool).
+`grok-sub` is a second Grok Heavy pool at `GROK_HOME=~/.grok-sub`.
 quota-axi has no grok-sub provider, so do not invent a quota-axi fork.
 For that candidate only, run quota-axi again with `GROK_HOME` set to that home, and read the `grok` provider row from that snapshot.
 Keep default Grok on the shared snapshot taken without that home, or with `GROK_HOME` unset / `~/.grok`.

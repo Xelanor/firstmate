@@ -7,7 +7,7 @@ Load this with the selected tool reference for dispatch, start, or adapter verif
 Use the router's detection and safety sections for static crew and secondmate harness resolution and all explicit overrides.
 `config/crew-dispatch.json` can override that static default for one crewmate or scout with concrete harness, model, and effort axes.
 `grok-sub` is a valid profile harness: it is the grok CLI on `GROK_HOME=~/.grok-sub`, same models as default Grok, and a distinct quota pool.
-Pass `--harness grok-sub` or `--harness grok --grok-home <path>` to `../../../bin/fm-spawn.sh`; do not collapse the two homes into one Grok.
+Pass `--harness grok-sub` to `../../../bin/fm-spawn.sh`; do not collapse the two homes into one Grok.
 For a profile array, load `quota-array-dispatch` after establishing harness and provider facts here.
 
 `../secondmate-provisioning/SKILL.md` owns inherited local material.

@@ -505,7 +505,7 @@ test_grok_omits_invalid_xhigh_reasoning_effort() {
   pass "grok omits unsupported xhigh reasoning effort"
 }
 
-test_grok_forwards_ambient_home_onto_launch_and_meta() {
+test_grok_default_stays_on_its_own_home() {
   local rec id out status launch grok_home
   id=profile-grok-home-z24
   rec=$(make_spawn_case profile-grok-home grok "$id")
@@ -517,13 +517,15 @@ test_grok_forwards_ambient_home_onto_launch_and_meta() {
   status=$?
   expect_code 0 "$status" "grok spawn with ambient GROK_HOME should succeed"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "GROK_HOME='$grok_home' env -u CURSOR_AGENT" \
-    "grok launch did not prefix ambient GROK_HOME so the CLI uses the same store as hooks"
+  assert_not_contains "$launch" "GROK_HOME=" \
+    "default grok must launch bare; ambient GROK_HOME must not divert it"
   assert_not_contains "$launch" ".grok-sub" \
     "default grok must not be forced onto grok-sub"
   assert_grep "harness=grok" "$HOME_DIR/state/$id.meta" "default grok meta must keep harness=grok"
-  assert_grep "grok_home=$grok_home" "$HOME_DIR/state/$id.meta" "default grok meta missing grok_home"
-  pass "default grok forwards ambient GROK_HOME and does not collapse onto grok-sub"
+  if grep -q '^grok_home=' "$HOME_DIR/state/$id.meta"; then
+    fail "default grok must record no grok_home; only grok-sub selects a home"
+  fi
+  pass "default grok launches on its own home and records no grok_home"
 }
 
 test_grok_sub_launches_on_second_home_not_ambient() {
@@ -568,51 +570,11 @@ test_grok_sub_survives_launch_env_strip() {
   expect_code 0 "$status" "grok-sub spawn with an empty launch-env allowlist should succeed"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "/usr/bin/env -i" "empty allowlist should wrap the launch"
-  # The emitted env -i prefix keeps this exact unexpanded parameter expansion.
-  # shellcheck disable=SC2016
-  assert_contains "$launch" '${GROK_HOME+"GROK_HOME=$GROK_HOME"}' \
-    "spawn must retain GROK_HOME when the home strips env"
-  assert_contains "$launch" "$sub_home" \
+  # The inner launch is single-quoted inside `sh -c`, so its GROK_HOME prefix
+  # appears with the '\'' escaping rather than a plain quote.
+  assert_contains "$launch" "sh -c 'GROK_HOME='\''$sub_home'\'' env -u CURSOR_AGENT" \
     "grok-sub GROK_HOME must remain on the inner launch when the home strips env"
   pass "grok-sub GROK_HOME survives launch-env stripping"
-}
-
-test_grok_home_flag_selects_explicit_store() {
-  local rec id out status launch other
-  id=profile-grok-home-flag-z27
-  rec=$(make_spawn_case profile-grok-home-flag grok "$id")
-  read_case_record "$rec"
-  other="$CASE_DIR/other-grok"
-  mkdir -p "$other"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness grok --grok-home "$other")
-  status=$?
-  expect_code 0 "$status" "grok spawn with --grok-home should succeed"
-  launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "GROK_HOME='$other'" "explicit --grok-home did not prefix the launch"
-  assert_not_contains "$launch" "GROK_HOME='$HOME_DIR/grok-home'" \
-    "--grok-home must win over ambient GROK_HOME"
-  assert_grep "harness=grok" "$HOME_DIR/state/$id.meta" "explicit grok home must keep harness=grok"
-  assert_grep "grok_home=$other" "$HOME_DIR/state/$id.meta" "explicit grok home missing from meta"
-  assert_present "$other/hooks/fm-turn-end.sh" "explicit --grok-home did not install hooks there"
-  pass "--grok-home selects the Grok store for CLI and hooks"
-}
-
-test_grok_home_flag_refuses_non_grok() {
-  local rec id out status
-  id=profile-grok-home-claude-z28
-  rec=$(make_spawn_case profile-grok-home-claude claude "$id")
-  read_case_record "$rec"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --grok-home "$HOME_DIR/grok-home")
-  status=$?
-  expect_code 1 "$status" "--grok-home on claude must refuse"
-  assert_contains "$out" "--grok-home applies only to grok and grok-sub" \
-    "refusal must name the grok-only flag"
-  [ ! -s "$LAUNCH_LOG" ] || fail "refused --grok-home still launched"
-  pass "--grok-home on a non-grok harness refuses before launch"
 }
 
 test_grok_sub_refuses_missing_home() {
@@ -1515,11 +1477,9 @@ test_codex_omits_max_effort_for_unsupported_model
 test_grok_threads_model_and_reasoning_effort
 test_grok_omits_invalid_max_reasoning_effort
 test_grok_omits_invalid_xhigh_reasoning_effort
-test_grok_forwards_ambient_home_onto_launch_and_meta
+test_grok_default_stays_on_its_own_home
 test_grok_sub_launches_on_second_home_not_ambient
 test_grok_sub_survives_launch_env_strip
-test_grok_home_flag_selects_explicit_store
-test_grok_home_flag_refuses_non_grok
 test_grok_sub_refuses_missing_home
 test_cursor_threads_model_workspace_and_omits_effort_axis
 test_cursor_refuses_model_absent_from_live_catalog
