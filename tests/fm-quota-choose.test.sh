@@ -268,6 +268,22 @@ out=$(call_choose --snapshot "$LAB/captured.json" --candidate grok:grok-4)
 [ "$out" = "grok grok-4" ] || fail "grok mapping: expected 'grok grok-4', got '$out'"
 ok "grok-sub maps to the grok provider row of the supplied snapshot"
 
+if err=$(call_choose --snapshot "$LAB/captured.json" --candidate grok:grok-4 --candidate grok-sub:grok-4 2>&1); then
+  fail "one snapshot scored both Grok subscriptions instead of refusing"
+fi
+case "$err" in
+  "error: grok and grok-sub are separate Grok subscriptions"*) ;;
+  *) fail "mixed grok/grok-sub call returned: $err" ;;
+esac
+if err=$(call_choose --snapshot "$LAB/captured.json" --candidate grok-sub:grok-4 --candidate grok:grok-4 2>&1); then
+  fail "reversed mixed grok/grok-sub call was silently scored from one snapshot"
+fi
+case "$err" in
+  "error: grok and grok-sub are separate Grok subscriptions"*) ;;
+  *) fail "reversed mixed grok/grok-sub call returned: $err" ;;
+esac
+ok "one call naming both grok and grok-sub is refused"
+
 if err=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate agy:default 2>&1); then
   fail "trailing unsupported harness was hidden by an earlier selection"
 fi

@@ -24,6 +24,7 @@ Deterministic shell owns only schema, configuration, and version validation plus
 The canonical shell helper for a worker that has already performed its model-selection reasoning and now needs to pick the first viable candidate is `bin/fm-quota-choose.sh`.
 Pass it the intake's already-captured default TOON or permitted JSON fallback through stdin or `--snapshot`; it never takes another quota snapshot, so it selects from the same quota state as the intake.
 For a grok-sub candidate, pass the snapshot captured with `GROK_HOME` set; the helper maps grok-sub to the grok provider row and will not invoke quota-axi itself.
+One invocation carries one snapshot, so score `grok` and `grok-sub` in separate calls and compare the two results yourself; the helper refuses a call that names both.
 Pass each candidate as `harness:model`, with earlier candidates preferred.
 The helper maps each harness to its primary provider family and applies the provider-wide scopes plus the exact model or product scopes for the model.
 An `exhausted_now` runway vetoes the candidate.

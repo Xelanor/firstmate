@@ -891,6 +891,28 @@ test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity() {
   pass "pi-signed is a distinct persistent secondmate runtime with shared Pi supervision semantics"
 }
 
+test_grok_sub_is_refused_for_a_secondmate() {
+  local rec id sm out status sub_home
+  id=profile-grok-sub-secondmate-z2a
+  rec=$(make_spawn_case profile-grok-sub-secondmate codex "$id")
+  read_case_record "$rec"
+  sub_home="$HOME_DIR/user-home/.grok-sub"
+  mkdir -p "$sub_home"
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$id"
+  sm=$(cd "$sm" && pwd -P)
+
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$sm" --harness grok-sub --secondmate)
+  status=$?
+  expect_code 1 "$status" "a grok-sub secondmate must be refused"
+  assert_contains "$out" "grok-sub is a crew-dispatch Grok pool only and cannot run a secondmate" \
+    "refusal must say grok-sub cannot run a secondmate"
+  [ ! -s "$LAUNCH_LOG" ] || fail "refused grok-sub secondmate still launched"
+  assert_absent "$HOME_DIR/state/$id.meta" "refused grok-sub secondmate still recorded task meta"
+  pass "grok-sub is refused for secondmates, so no unrecoverable mate is recorded"
+}
+
 test_batch_forwards_shared_profile_flags() {
   local rec id1 id2 out status
   id1=profile-batch-a-z9
@@ -1493,6 +1515,7 @@ test_pi_tui_mode_probe_is_safe_for_old_and_new_pi
 test_pi_signed_threads_shared_pi_profile_and_preserves_identity
 test_pi_signed_missing_binary_refuses_before_endpoint_or_metadata
 test_pi_signed_persistent_secondmate_uses_pi_extensions_and_identity
+test_grok_sub_is_refused_for_a_secondmate
 test_batch_forwards_shared_profile_flags
 test_claude_forwards_firstmate_config_dir_when_set
 test_claude_omits_config_dir_prefix_when_unset

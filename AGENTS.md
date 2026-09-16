@@ -212,7 +212,7 @@ A silent bootstrap section needs no action; for any printed actionable diagnosti
 
 Load `harness-adapters` before every spawn or recovery and before trust handling, skill invocation, interrupt, exit, resume, or adapter verification.
 The verified harnesses are `claude`, `codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, and `omp`, plus `muse`, `gemini`, `rovo`, and `agy` for crewmates and scouts only; never dispatch on an unverified adapter.
-`grok-sub` is a second Grok Heavy pool at `GROK_HOME=~/.grok-sub`, not a new adapter.
+`grok-sub` is a second Grok Heavy pool at `GROK_HOME=~/.grok-sub`, not a new adapter, and it is crewmate/scout only.
 Default Grok stays `~/.grok`.
 Rank both independently from live quota; do not collapse them into one Grok.
 If static `config/crew-harness` or `config/secondmate-harness` names an unverified adapter, report it and fall back only to a verified adapter rather than launching it.
@@ -222,6 +222,7 @@ When dispatch profiles exist, consult them at every crewmate or scout intake and
 Routing precedence is an explicit per-task captain override, then the best-fit configured rule, then the configured default, then the static crewmate harness.
 Firstmate alone resolves a matched profile array: begin with `quota-axi`'s default TOON at that intake, using the skill's narrow TOON-then-`--json` fallback only for genuine ambiguity, evaluate every configured candidate against that current output, and choose with inspectable `spendPriority` as the one quota-perspective ranker after the skill's eligibility, reasoning-class, and runway-feasibility gates.
 A `grok-sub` candidate needs its own quota-axi read with `GROK_HOME` set to that Grok home; quota-axi has no grok-sub provider.
+One snapshot therefore describes one Grok subscription, so score `grok` and `grok-sub` in separate `bin/fm-quota-choose.sh` calls; naming both in one call is refused.
 Account for every candidate with the catalog evidence, provider relationship, applicable quota and authentication facts, remaining uncertainty, fit and reasoning class, and the spendPriority and runway evidence used in selection; never omit a candidate, guess, fall back silently, or call the result quota-informed without them.
 Establish model support and provider family from that harness's own authoritative catalog, then read `quota-axi` at the granularity the vendor actually supplies: provider-level or all-model evidence applies to every model established in that family, and a named-model window bounds only that model.
 Missing model-level quota, a missing authentication source, unmeasurable headroom, or unmodeled authentication is disclosed uncertainty that keeps a candidate eligible, never a credential or login escalation.

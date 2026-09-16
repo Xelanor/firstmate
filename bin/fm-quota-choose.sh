@@ -27,6 +27,9 @@
 # grok provider row of the snapshot it is given; the caller must capture that
 # snapshot with GROK_HOME set to that home because quota-axi has no grok-sub
 # provider. It never forks quota-axi or takes a second snapshot itself.
+# One invocation therefore carries exactly one Grok subscription's evidence, so
+# naming both grok and grok-sub in the same call is refused rather than scored
+# twice from one row: rank them with one call per snapshot.
 # Multi-provider limitation: this helper maps each harness to ONE primary
 # provider family (see provider_for_harness below) and checks quota for that
 # family only. Some harnesses can run models from several providers - for
@@ -371,6 +374,8 @@ effective_for_provider_model() {
   ' 2>/dev/null
 }
 
+grok_seen=0
+grok_sub_seen=0
 for c in "${CANDIDATES[@]}"; do
   harness=${c%%:*}
   model=${c#*:}
@@ -381,7 +386,13 @@ for c in "${CANDIDATES[@]}"; do
     omp) die "omp quota mapping covers only the openai-codex and claude-bridge prefixes: $model" ;;
     *) die "unknown harness: $harness" ;;
   esac
+  case "$harness" in
+    grok) grok_seen=1 ;;
+    grok-sub) grok_sub_seen=1 ;;
+  esac
 done
+[ "$grok_seen" -eq 0 ] || [ "$grok_sub_seen" -eq 0 ] || \
+  die "grok and grok-sub are separate Grok subscriptions and quota-axi measures whichever one GROK_HOME selected, so this snapshot describes only one of them; rank them with one call per snapshot instead of naming both here"
 
 chosen="none"
 for c in "${CANDIDATES[@]}"; do

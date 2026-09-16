@@ -141,8 +141,8 @@
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
 #   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|grok-sub|kimi|cursor|gemini|muse|rovo|omp|agy)
-#   overrides it for this spawn (either kind). grok-sub is the grok CLI on the
-#   second Grok home, not a separate adapter. A non-flag string containing
+#   overrides it for this spawn. grok-sub is the grok CLI on the second Grok
+#   home, not a separate adapter, and is crewmate/scout only. A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, fm-spawn resolves the selected executable
 #   name from PATH once, probes that concrete path with --help, and launches the
@@ -1544,7 +1544,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
-  '' | claude | codex | opencode | pi | pi-signed | grok | grok-sub | kimi | cursor | gemini | muse | rovo | omp | agy)
+  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy)
     ARG3=${POS[1]:-}
     ;;
   *' '*)
@@ -1951,6 +1951,15 @@ fi
 # standing one up with no way to arm its watch cycle.
 if [ "$KIND" = secondmate ] && [ "$HARNESS" = rovo ]; then
   echo "error: rovo is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
+  exit 1
+fi
+
+# grok-sub is a crew-dispatch pool, not a secondmate adapter: recovery and the
+# remote secondmate control plane both key on the exact recorded harness and
+# know only `grok`, so a grok-sub secondmate would be stood up and then skipped
+# by its own restart sweep. Refuse it here instead.
+if [ "$KIND" = secondmate ] && [ "$HARNESS" = grok-sub ]; then
+  echo "error: grok-sub is a crew-dispatch Grok pool only and cannot run a secondmate; use grok for a secondmate." >&2
   exit 1
 fi
 
