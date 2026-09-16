@@ -23,6 +23,7 @@ Deterministic shell owns only schema, configuration, and version validation plus
 
 The canonical shell helper for a worker that has already performed its model-selection reasoning and now needs to pick the first viable candidate is `bin/fm-quota-choose.sh`.
 Pass it the intake's already-captured default TOON or permitted JSON fallback through stdin or `--snapshot`; it never takes another quota snapshot, so it selects from the same quota state as the intake.
+For a grok-sub candidate, pass the snapshot captured with `GROK_HOME` set; the helper maps grok-sub to the grok provider row and will not invoke quota-axi itself.
 Pass each candidate as `harness:model`, with earlier candidates preferred.
 The helper maps each harness to its primary provider family and applies the provider-wide scopes plus the exact model or product scopes for the model.
 An `exhausted_now` runway vetoes the candidate.
@@ -36,7 +37,13 @@ Firstmate can optionally arm `bin/fm-procevent-quota.sh` for a recurring mid-tas
 
 ## Read the default TOON
 
-Start each intake by running `quota-axi` once with no `--json`, and reuse that TOON for every candidate.
+Start each intake by running `quota-axi` once with no `--json`, and reuse that TOON for every candidate except `grok-sub`.
+`grok-sub` is a second Grok Heavy pool at `GROK_HOME=~/.grok-sub` (or the per-spawn `--grok-home` that names that pool).
+quota-axi has no grok-sub provider, so do not invent a quota-axi fork.
+For that candidate only, run quota-axi again with `GROK_HOME` set to that home, and read the `grok` provider row from that snapshot.
+Keep default Grok on the shared snapshot taken without that home, or with `GROK_HOME` unset / `~/.grok`.
+Rank `grok`, `grok-sub`, `claude`, `codex`, `gemini`, and `opencode` independently by `spendPriority`.
+Never reuse the default Grok snapshot as grok-sub quota, and never force every Grok candidate onto grok-sub.
 Post-consolidation quota-axi (the floor owned by `bin/fm-quota-axi-lib.sh`) puts `spendPriority` in the default `quota[]` block beside `effectivePercentRemaining`, `runway`, `confidence`, `limitedBy`, and `resetsAt`.
 Sparse `exhaustion[]` carries finite-runway seconds only for `projected_exhaustion` and `exhausted_now`.
 Sparse `attention[]` names auth, stale, and unmeasurable facts.
@@ -46,7 +53,7 @@ Do not read `--json` on the normal path, and do not reach for `--full` to rebuil
 
 After reading the TOON, fall back to one `quota-axi --json` call only when that TOON is genuinely ambiguous for the decision, or when the installed quota-axi is somehow below the floor so its TOON lacks `spendPriority`.
 Ambiguous means a candidate's `spendPriority` is the literal `unknown` or unmeasurable, a real tie still needs extra evidence, or a candidate's eligibility is unclear from `quota[]` plus `attention[]`.
-The fallback therefore has an explicit TOON-then-JSON call sequence; reuse its JSON result and do not take any further quota snapshots.
+The fallback therefore has an explicit TOON-then-JSON call sequence; reuse its JSON result and do not take any further quota snapshots beyond the grok-sub `GROK_HOME` read above.
 Below-floor is rare: bootstrap enforces `FM_QUOTA_AXI_MIN` and normally reports `MISSING` before dispatch; if an intake somehow reaches an older build whose TOON lacks `spendPriority`, use the defensive `--json` fallback rather than treating the missing scalar as healthy.
 `--json` is a defensive belt, not a habit; never reach for it because it feels more complete.
 Read `quota-axi auth --json` only when a candidate's credential surface is in question.
@@ -62,7 +69,7 @@ It cannot override a hard-gate failure, and it is never hidden inside a new comp
 ### 1. Eligibility
 
 Deterministic shell must never map a model to a provider, a provider to a credential store, or a name prefix to a family.
-You establish those relations yourself, in the open, from the candidate's own authoritative catalog (`harness-adapters` owns the per-harness discovery surface) plus the one intake snapshot.
+You establish those relations yourself, in the open, from the candidate's own authoritative catalog (`harness-adapters` owns the per-harness discovery surface) plus the intake snapshot that belongs to that candidate (the shared default TOON, or the grok-sub snapshot taken with `GROK_HOME` set).
 
 Confirm the catalog lists the candidate's model and record the provider family it reports.
 A model the catalog does not list is concrete contradictory evidence: block that candidate and quote the catalog result.

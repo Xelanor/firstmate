@@ -112,6 +112,52 @@ SH
   pass "fm-lock recognizes grok harness processes"
 }
 
+test_grok_sub_hooks_use_second_home() {
+  local rec case_dir home proj wt fakebin grok_home id out status sub_home token
+  rec=$(make_spawn_case hook-sub)
+  IFS='|' read -r case_dir home proj wt fakebin grok_home id <<EOF
+$rec
+EOF
+  sub_home="$home/user-home/.grok-sub"
+  mkdir -p "$sub_home"
+  out=$(fm_test_run_spawn "$home" "$wt" "$fakebin" \
+    "$id" "$proj" --harness grok-sub --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "grok-sub spawn should succeed"$'\n'"$out"
+  assert_present "$sub_home/hooks/fm-turn-end.sh" "grok-sub hook was not installed under ~/.grok-sub"
+  assert_absent "$grok_home/hooks/fm-turn-end.sh" "grok-sub must not write hooks under ambient GROK_HOME"
+  token=$(sed -n 's/^token=//p' "$wt/.fm-grok-turnend")
+  assert_present "$sub_home/hooks/fm-turn-end.d/$token" "grok-sub auth registry was not under the second home"
+  pass "grok-sub turn-end hook lives under ~/.grok-sub"
+}
+
+test_grok_sub_teardown_uses_recorded_home() {
+  local rec case_dir home proj wt fakebin grok_home id out status sub_home token
+  rec=$(make_spawn_case teardown-sub)
+  IFS='|' read -r case_dir home proj wt fakebin grok_home id <<EOF
+$rec
+EOF
+  sub_home="$home/user-home/.grok-sub"
+  mkdir -p "$sub_home"
+  out=$(fm_test_run_spawn "$home" "$wt" "$fakebin" \
+    "$id" "$proj" --harness grok-sub --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "grok-sub spawn should succeed before teardown"
+  token=$(sed -n 's/^token=//p' "$wt/.fm-grok-turnend")
+
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    PATH="$fakebin:$PATH" \
+    "$TEARDOWN" "$id" --force >/dev/null 2>&1 \
+    || fail "grok-sub teardown failed without ambient GROK_HOME"
+
+  assert_absent "$wt/.fm-grok-turnend" "grok-sub pointer survived teardown"
+  assert_absent "$sub_home/hooks/fm-turn-end.d/$token" "grok-sub auth token survived teardown"
+  assert_absent "$home/state/$id.grok-turnend-token" "grok-sub state token survived teardown"
+  pass "grok-sub teardown removes the token from the recorded Grok home"
+}
+
 test_grok_hook_requires_registered_token
 test_grok_teardown_removes_pointer_and_token
+test_grok_sub_hooks_use_second_home
+test_grok_sub_teardown_uses_recorded_home
 test_fm_lock_recognizes_grok_holder

@@ -2,8 +2,11 @@
   "rules": [
     {
       "when": "The task depends on fresh news, current events, live public facts, or recent market and product changes.",
-      "use": { "harness": "grok" },
-      "why": "Grok is the preferred dispatch when current web-connected context is central to the work."
+      "use": [
+        { "harness": "grok" },
+        { "harness": "grok-sub" }
+      ],
+      "why": "Grok is the preferred dispatch when current web-connected context is central to the work. grok and grok-sub are two Grok Heavy subscriptions; rank them independently by live quota."
     },
     {
       "when": "The task is a trivial mechanical edit such as a rote rename, formatting sweep, targeted typo fix, or simple file gathering.",

@@ -137,6 +137,21 @@ cat > "$FIXTURE" <<'JSON'
         "status": "unknown",
         "effectiveAvailability": []
       }
+    },
+    {
+      "provider": "grok",
+      "windows": [],
+      "quotaSemantics": {
+        "status": "known",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 80,
+            "runway": { "status": "through_reset" }
+          }
+        ]
+      }
     }
   ]
 }
@@ -246,6 +261,12 @@ if err=$(call_choose --snapshot "$LAB/captured.json" --candidate bogus:model --c
 fi
 [ "$err" = "error: unknown harness: bogus" ] || fail "unknown harness returned: $err"
 ok "unknown harness fails closed"
+
+out=$(call_choose --snapshot "$LAB/captured.json" --candidate grok-sub:grok-4)
+[ "$out" = "grok-sub grok-4" ] || fail "grok-sub mapping: expected 'grok-sub grok-4', got '$out'"
+out=$(call_choose --snapshot "$LAB/captured.json" --candidate grok:grok-4)
+[ "$out" = "grok grok-4" ] || fail "grok mapping: expected 'grok grok-4', got '$out'"
+ok "grok-sub maps to the grok provider row of the supplied snapshot"
 
 if err=$(call_choose --snapshot "$LAB/captured.json" --candidate claude:default --candidate agy:default 2>&1); then
   fail "trailing unsupported harness was hidden by an earlier selection"

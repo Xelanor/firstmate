@@ -23,6 +23,10 @@
 # reasoning-class or runway-feasibility gates; it only answers which ordered
 # candidate remains eligible under the captured quota evidence.
 #
+# grok-sub is the grok CLI on a second Grok home. This helper maps it to the
+# grok provider row of the snapshot it is given; the caller must capture that
+# snapshot with GROK_HOME set to that home because quota-axi has no grok-sub
+# provider. It never forks quota-axi or takes a second snapshot itself.
 # Multi-provider limitation: this helper maps each harness to ONE primary
 # provider family (see provider_for_harness below) and checks quota for that
 # family only. Some harnesses can run models from several providers - for
@@ -310,11 +314,13 @@ printf '%s\n' "$QUOTA_JSON" | fm_quota_json_valid || die "invalid quota-axi prov
 
 # provider_for_harness <harness> [<model>]
 # Map a firstmate harness name to its primary quota-axi provider family.
-# Multi-provider harnesses (Pi, OpenCode) map to their primary family only; see
-# the header limitation note. omp is keyed on the candidate model prefix instead
-# and has no family for any other prefix (see the header). Authoritative
-# multi-provider routing is owned by AGENTS.md section 4 and the
-# quota-array-dispatch skill, not this helper.
+# grok-sub maps to grok because quota-axi has no grok-sub provider; the
+# snapshot must already be from that Grok home. Multi-provider harnesses
+# (Pi, OpenCode) map to their primary family only; see the header limitation
+# note. omp is keyed on the candidate model prefix instead and has no family
+# for any other prefix (see the header). Authoritative multi-provider routing
+# is owned by AGENTS.md section 4 and the quota-array-dispatch skill, not
+# this helper.
 provider_for_harness() {
   case "$1" in
     omp)
@@ -328,7 +334,7 @@ provider_for_harness() {
     codex)        printf 'codex\n' ;;
     opencode)     printf 'codex\n' ;;
     pi|pi-signed) printf 'pi\n' ;;
-    grok)         printf 'grok\n' ;;
+    grok|grok-sub) printf 'grok\n' ;;
     kimi)         printf 'kimi\n' ;;
     cursor)       printf 'cursor\n' ;;
     muse)         printf 'meta\n' ;;

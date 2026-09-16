@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
-#        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--grok-home <path>] [--backend <name>]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--grok-home <path>] [--backend <name>]
+#        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--grok-home <path>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
 #   per task at intake (AGENTS.md section 7); data/projects.md holds the captain's
@@ -28,7 +28,7 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--grok-home <path>]
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded endpoint and worktree instead of creating either. It is
 #   the launch half of the control plane (bin/fm-control.sh relaunch), which
@@ -53,6 +53,14 @@
 #   from that harness's launch rather than guessed. Ultra is the explicit
 #   exception: bin/fm-harness.sh validate-native-effort owns its model scope;
 #   supported Pi launches receive --codex-effort ultra, never --thinking ultra.
+#   --grok-home <path> is the per-spawn Grok config home for grok and grok-sub.
+#   It must be an absolute existing directory. Default unset means the grok CLI
+#   and turn-end hooks use ~/.grok. grok-sub is the second Grok Heavy pool: it
+#   launches the grok CLI with GROK_HOME=$HOME/.grok-sub unless this flag names
+#   another home, and it is ranked independently of default grok. A grok spawn
+#   also forwards a non-empty ambient GROK_HOME onto the launch and hooks so
+#   CLI, auth, and hooks share one home; grok-sub never inherits that ambient
+#   value, so firstmate's own Grok home cannot collapse the two pools.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
@@ -135,8 +143,9 @@
 #   profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
-#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy)
-#   overrides it for this spawn (either kind). A non-flag string containing
+#   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|grok-sub|kimi|cursor|gemini|muse|rovo|omp|agy)
+#   overrides it for this spawn (either kind). grok-sub is the grok CLI on the
+#   second Grok home, not a separate adapter. A non-flag string containing
 #   whitespace is treated as a RAW launch command - the escape hatch for verifying
 #   new adapters. For pi and pi-signed, fm-spawn resolves the selected executable
 #   name from PATH once, probes that concrete path with --help, and launches the
@@ -221,7 +230,7 @@
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
-#   source of truth; shared --scout/--harness/--model/--effort/--backend/--mode/--yolo
+#   source of truth; shared --scout/--harness/--model/--effort/--grok-home/--backend/--mode/--yolo
 #   applies to every pair. A ship batch therefore carries one delivery contract, and each
 #   pair still checks it against its own brief; a batch spanning modes is two invocations.
 #   If config/crew-dispatch.json exists, shared --harness is required for crewmate
@@ -287,7 +296,8 @@
 # Verified per-harness turn-end hooks are installed automatically where enabled; some live outside the worktree.
 # Kimi uses one surgically installed Firstmate region in $HOME/.kimi-code/config.toml,
 # a firstmate-owned global hook and registry, and a gitignored per-task pointer.
-# grok uses a firstmate-owned global hook under ${GROK_HOME:-$HOME/.grok}/hooks
+# grok uses a firstmate-owned global hook under the per-spawn Grok home
+# (${GROK_HOME:-$HOME/.grok}/hooks; grok-sub uses $HOME/.grok-sub)
 # plus a gitignored .fm-grok-turnend worktree pointer and a state token.
 # muse installs no hook at all - its plugin engine is off in the default build - so
 # it writes state/<id>.muse-session to bind the pane to muse's own session event
@@ -511,6 +521,8 @@ KIND_SET=0
 HARNESS_ARG=
 MODEL=
 EFFORT=
+GROK_HOME_ARG=
+SPAWN_GROK_HOME=
 BACKEND_ARG=
 MODE=
 YOLO=
@@ -518,6 +530,7 @@ TRACEPARENT_ARG=
 HARNESS_SET=0
 MODEL_SET=0
 EFFORT_SET=0
+GROK_HOME_SET=0
 BACKEND_SET=0
 MODE_SET=0
 YOLO_SET=0
@@ -545,6 +558,10 @@ for a in "$@"; do
     effort)
       EFFORT=$a
       EFFORT_SET=1
+      ;;
+    grok-home)
+      GROK_HOME_ARG=$a
+      GROK_HOME_SET=1
       ;;
     backend)
       BACKEND_ARG=$a
@@ -595,6 +612,11 @@ for a in "$@"; do
     EFFORT=${a#--effort=}
     EFFORT_SET=1
     ;;
+  --grok-home) want_value=grok-home ;;
+  --grok-home=*)
+    GROK_HOME_ARG=${a#--grok-home=}
+    GROK_HOME_SET=1
+    ;;
   --backend) want_value=backend ;;
   --backend=*)
     BACKEND_ARG=${a#--backend=}
@@ -632,6 +654,10 @@ done
 }
 [ "$EFFORT_SET" -eq 0 ] || [ -n "$EFFORT" ] || {
   echo "error: --effort requires a non-empty value" >&2
+  exit 1
+}
+[ "$GROK_HOME_SET" -eq 0 ] || [ -n "$GROK_HOME_ARG" ] || {
+  echo "error: --grok-home requires a non-empty value" >&2
   exit 1
 }
 [ "$BACKEND_SET" -eq 0 ] || [ -n "$BACKEND_ARG" ] || {
@@ -785,7 +811,7 @@ spawn_remote_secondmate() {
     harness=$("$FM_ROOT/bin/fm-harness.sh" secondmate)
   fi
   case "$harness" in
-  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor) ;;
+  claude | codex | opencode | pi | pi-signed | grok | grok-sub | kimi | cursor) ;;
   *)
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
@@ -1096,7 +1122,8 @@ spawn_abort_cleanup() {
       "$RELAUNCH_REPLACEMENT_HARNESS" \
       "$RELAUNCH_REPLACEMENT_WT" \
       "$RELAUNCH_REPLACEMENT_STATE" \
-      "$ID"; then
+      "$ID" \
+      "${SPAWN_GROK_HOME:-}"; then
       echo "warning: could not remove replacement wiring after aborted relaunch of $ID" >&2
     fi
     if [ -n "$RELAUNCH_REPLACEMENT_BUSY_GEN" ]; then
@@ -1236,7 +1263,7 @@ spawn_herdr_presentation_order_lock_acquire() {
 }
 
 clear_relaunch_harness_wiring() {
-  local harness=$1 wt=$2 state=$3 id=$4 token_path token auth_path path
+  local harness=$1 wt=$2 state=$3 id=$4 token_path token auth_path path grok_home
   # The wiring arms above match on harness PREFIXES, because a task launched
   # from a raw command records that command's basename rather than the exact
   # adapter name. The retirement tables are keyed by the exact adapter, so the
@@ -1250,7 +1277,16 @@ clear_relaunch_harness_wiring() {
   if [ -n "$token_path" ] && [ -f "$token_path" ]; then
     IFS= read -r token <"$token_path" || [ -n "$token" ] || return 1
   fi
-  auth_path=$(fm_control_harness_turnend_auth_path "$harness" "$token") || return 1
+  grok_home=
+  if [ "$harness" = grok ]; then
+    grok_home=${5-}
+    [ -n "$grok_home" ] || grok_home=$(fm_meta_get "$state/$id.meta" grok_home)
+  fi
+  if [ "$harness" = grok ] && [ -n "$grok_home" ]; then
+    auth_path=$(GROK_HOME=$grok_home fm_control_harness_turnend_auth_path grok "$token") || return 1
+  else
+    auth_path=$(fm_control_harness_turnend_auth_path "$harness" "$token") || return 1
+  fi
   if [ -n "$auth_path" ]; then
     rm -f -- "$auth_path" || return 1
   fi
@@ -1290,6 +1326,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ -z "$HARNESS_ARG" ] || shared_args+=(--harness "$HARNESS_ARG")
   [ -z "$MODEL" ] || shared_args+=(--model "$MODEL")
   [ -z "$EFFORT" ] || shared_args+=(--effort "$EFFORT")
+  [ "$GROK_HOME_SET" -eq 0 ] || shared_args+=(--grok-home "$GROK_HOME_ARG")
   [ -z "$BACKEND_ARG" ] || shared_args+=(--backend "$BACKEND_ARG")
   # One delivery contract applies to every pair in a batch, exactly like the shared
   # harness. Each pair still re-validates it against its own brief, so a batch
@@ -1527,7 +1564,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   }
 elif [ "$KIND" = secondmate ]; then
   case "${POS[1]:-}" in
-  '' | claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy)
+  '' | claude | codex | opencode | pi | pi-signed | grok | grok-sub | kimi | cursor | gemini | muse | rovo | omp | agy)
     ARG3=${POS[1]:-}
     ;;
   *' '*)
@@ -1752,7 +1789,7 @@ launch_template() {
   # --dangerously-skip-permissions. grok's turn-end signal does NOT ride the
   # launch command - it is a Stop-event hook installed below (global hook +
   # per-task pointer), so the template is identical for ship/scout/secondmate.
-  grok) printf '%s' 'grok --always-approve __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+  grok | grok-sub) printf '%s' 'grok --always-approve __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
   # Cursor Agent CLI. --trust suppresses the workspace-trust prompt, which
   # --yolo does NOT cover and which would otherwise block every spawn, since
   # each task gets a fresh worktree path cursor has never seen. --yolo is the
@@ -1935,6 +1972,64 @@ fi
 if [ "$KIND" = secondmate ] && [ "$HARNESS" = rovo ]; then
   echo "error: rovo is a verified crewmate/scout adapter only and cannot run a secondmate; it has no primary supervision protocol. Select a harness verified for secondmates." >&2
   exit 1
+fi
+
+# Per-spawn Grok home: grok-sub is a second pool at $HOME/.grok-sub and never
+# inherits firstmate's ambient GROK_HOME. Default grok forwards a set ambient
+# GROK_HOME so CLI, auth, and hooks share that home; unset means ~/.grok.
+SPAWN_GROK_HOME=
+case "$HARNESS" in
+grok | grok-sub)
+  if [ "$GROK_HOME_SET" -eq 1 ]; then
+    SPAWN_GROK_HOME=$GROK_HOME_ARG
+  elif [ "$HARNESS" = grok-sub ]; then
+    if [ "$RELAUNCH" -eq 1 ]; then
+      SPAWN_GROK_HOME=$(fm_meta_get "$RELAUNCH_META" grok_home)
+    fi
+    [ -n "$SPAWN_GROK_HOME" ] || SPAWN_GROK_HOME="${HOME:-}/.grok-sub"
+  else
+    if [ -n "${GROK_HOME:-}" ]; then
+      SPAWN_GROK_HOME=$GROK_HOME
+    elif [ "$RELAUNCH" -eq 1 ]; then
+      case "$RELAUNCH_PRIOR_HARNESS" in
+      grok) SPAWN_GROK_HOME=$(fm_meta_get "$RELAUNCH_META" grok_home) ;;
+      esac
+    fi
+  fi
+  if [ -n "$SPAWN_GROK_HOME" ]; then
+    case "$SPAWN_GROK_HOME" in
+    /*) ;;
+    *)
+      echo "error: Grok home '$SPAWN_GROK_HOME' is a relative path; pass an absolute --grok-home so the grok CLI, auth, and turn-end hooks share one store" >&2
+      exit 1
+      ;;
+    esac
+    if [ "$GROK_HOME_SET" -eq 1 ] || [ "$HARNESS" = grok-sub ]; then
+      [ -d "$SPAWN_GROK_HOME" ] || {
+        echo "error: Grok home '$SPAWN_GROK_HOME' is not a directory; grok-sub and --grok-home require an already-configured Grok home" >&2
+        exit 1
+      }
+    fi
+  fi
+  ;;
+*)
+  if [ "$GROK_HOME_SET" -eq 1 ]; then
+    echo "error: --grok-home applies only to grok and grok-sub; '$HARNESS' has no Grok config home" >&2
+    exit 1
+  fi
+  ;;
+esac
+if [ "$LAUNCH_ENV_ENABLED" = 1 ] && [ -n "$SPAWN_GROK_HOME" ]; then
+  case $'\n'"$LAUNCH_ENV_NAMES"$'\n' in
+  *$'\nGROK_HOME\n'*) ;;
+  *)
+    if [ -n "$LAUNCH_ENV_NAMES" ]; then
+      LAUNCH_ENV_NAMES="$LAUNCH_ENV_NAMES"$'\nGROK_HOME'
+    else
+      LAUNCH_ENV_NAMES=GROK_HOME
+    fi
+    ;;
+  esac
 fi
 
 case "$HARNESS" in
@@ -2142,7 +2237,7 @@ model_flag_for_harness() {
   local harness=$1 model=$2
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$harness" in
-  claude | codex | opencode | pi | pi-signed | grok | kimi | cursor | gemini | muse | rovo | omp | agy)
+  claude | codex | opencode | pi | pi-signed | grok | grok-sub | kimi | cursor | gemini | muse | rovo | omp | agy)
     printf -- '--model %s ' "$(shell_quote "$model")"
     ;;
   esac
@@ -2169,11 +2264,11 @@ effort_flag_for_harness() {
       ;;
     esac
     ;;
-  grok)
+  grok | grok-sub)
     # grok exposes both --effort and --reasoning-effort; firstmate's profile
     # axis is the reasoning knob. As of grok 0.2.99, --reasoning-effort accepts
     # only low|medium|high and rejects both xhigh and max, so omit those rather
-    # than passing a known-bad value.
+    # than passing a known-bad value. grok-sub is the same CLI on a second home.
     case "$effort" in
     low | medium | high) printf -- '--reasoning-effort %s ' "$(shell_quote "$effort")" ;;
     esac
@@ -3897,7 +3992,7 @@ EOF
     # (gitignored, like the other harnesses' worktree hook files).
     # Result: the hook is outside the worktree, needs no trust grant, and never
     # touches grok's managed config - only firstmate-owned files.
-    GROK_HOOKS_DIR="${GROK_HOME:-$HOME/.grok}/hooks"
+    GROK_HOOKS_DIR="${SPAWN_GROK_HOME:-$HOME/.grok}/hooks"
     GROK_AUTH_DIR="$GROK_HOOKS_DIR/fm-turn-end.d"
     mkdir -p "$GROK_AUTH_DIR"
     old_umask=$(umask)
@@ -4063,7 +4158,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort grok_home busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -4081,6 +4176,7 @@ preserve_relaunch_meta() {
   echo "tasktmp=$TASK_TMP"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
+  [ -z "$SPAWN_GROK_HOME" ] || echo "grok_home=$SPAWN_GROK_HOME"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
   # Default-off writes no traceparent= line.
@@ -4245,7 +4341,7 @@ agy) LAUNCH=${LAUNCH//__AGYBIN__/"$(shell_quote "$AGY_BIN")"} ;;
 esac
 LAUNCH=${LAUNCH//__WORKTREE__/$sq_worktree}
 case "$HARNESS" in
-claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy)
+claude | codex | opencode | pi | pi-signed | grok | grok-sub | kimi | gemini | muse | rovo | agy)
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
@@ -4258,6 +4354,12 @@ esac
 # an unset value is the single-store default and needs no prefix.
 if [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
+fi
+# Crewmate panes do not inherit firstmate's environment. Prefix GROK_HOME when
+# this spawn selected a Grok home so the grok CLI, auth, and turn-end hooks
+# read the same store. Unset stays the ~/.grok default and adds no prefix.
+if [ -n "$SPAWN_GROK_HOME" ]; then
+  LAUNCH="GROK_HOME=$(shell_quote "$SPAWN_GROK_HOME") $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")

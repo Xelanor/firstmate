@@ -1179,12 +1179,17 @@ fi
 # owned by bin/fm-control-lib.sh, so teardown and the control plane's relaunch
 # retire the same artifact rather than each carrying its own copy of the path.
 remove_grok_turnend_auth() {
-  local state_dir=$1 id=$2 token_path token='' path
+  local state_dir=$1 id=$2 token_path token='' path grok_home=''
   token_path=$(fm_control_harness_turnend_token_path grok "$state_dir" "$id") || return 1
   if [ -n "$token_path" ] && [ -f "$token_path" ]; then
     IFS= read -r token < "$token_path" || [ -n "$token" ] || return 1
   fi
-  path=$(fm_control_harness_turnend_auth_path grok "$token") || return 1
+  grok_home=$(fm_meta_get "$state_dir/$id.meta" grok_home)
+  if [ -n "$grok_home" ]; then
+    path=$(GROK_HOME=$grok_home fm_control_harness_turnend_auth_path grok "$token") || return 1
+  else
+    path=$(fm_control_harness_turnend_auth_path grok "$token") || return 1
+  fi
   [ -n "$path" ] || return 0
   rm -f -- "$path"
 }
