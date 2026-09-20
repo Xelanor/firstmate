@@ -1,0 +1,68 @@
+# NO-OP ARM: spawning home's OWN clone already owns the pool worktree
+warning: /tmp/fm-pooltrust-lab/homeA/data/ownwt1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: ownwt1 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned ownwt1 harness=claude kind=ship mode=local-only yolo=off window=fm-lab-pooltrust-89792-2447:w4:p2 worktree=/home/berke/.treehouse/labproj-467403/1/labproj
+SPAWN_EXIT=0
+# trust entries registered in the isolated store:
+trusted: /home/berke/.treehouse/labproj-467403/1/labproj
+trusted: /tmp/fm-pooltrust-lab/homeA/projects/labproj
+treehouse get
+berke@Berke:/tmp/fm-pooltrust-lab/homeA/projects/labproj$ treehouse get
+A new version of treehouse is available: v2.1.1 → v2.3.0
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/labproj-467403/1/labproj. Type 'exit' to return.
+berke@Berke:~/.treehouse/labproj-467403/1/labproj$ export GOTMPDIR=/tmp/fm-ownwt1/gotmp
+berke@Berke:~/.treehouse/labproj-467403/1/labproj$ export COMPACT_ADVISER_DISABLE=1
+berke@Berke:~/.treehouse/labproj-467403/1/labproj$ export FM_TASK_ID=ownwt1
+berke@Berke:~/.treehouse/labproj-467403/1/labproj$ . '/tmp/fm-ownwt1+3f6af94d41b4c485c970cb296
+e2d23b19564c57174cc6118789ba0f5c26cbc65/launch.s1789925288.88230.18979.sh'
+ ▐▛███▛█   Claude Code v2.1.278
+▝▜██████▀  Opus 5 (1M context) · Claude Max
+  ▝▝ ▝▝    ~/.treehouse/labproj-467403/1/labproj
+
+
+❯ FIRSTMATE_OP: v1 launch-brief: # Current worker role contract
+  You are a crewmate: an autonomous worker agent managed by firstmate.
+  This section establishes your current identity before every project or task instruction
+  below and supersedes any conflicting role identity in those instructions.
+  Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or
+  secondmate supervisor identity, delegate the task, run fleet supervision, or address the
+  captain.
+  Your steering inbox is /tmp/fm-pooltrust-lab/homeA/state/ownwt1.inbox; this exact path
+  belongs to your current task even when it is outside the worktree or under the supervising
+  firstmate home, so read and acknowledge its messages and do not reject it as another home's
+  state.
+  Never inspect or change any other home's endpoint namespace; this authorization is limited
+  to the exact task paths named by this brief.
+  When this task works on Firstmate itself, the repository root AGENTS.md (also imported by
+  CLAUDE.md) is project content and the supervisor contract for the firstmate managing you:
+  follow this brief instead of that supervisor contract.
+  Project instructions still govern the work wherever they do not conflict with this worker
+  identity, including CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+
+  Task
+
+  Captain's intent
+
+  Prove a claude worker launches from a pooled worktree.
+
+  Firstmate spec
+
+  Reply with exactly: POOLED-BRIEF-REACHED
+
+● POOLED-BRIEF-REACHED
+
+✻ Worked for 1s · done 8:28 PM
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+ We recommend Opus 5 at medium effort
+
+   Opus 5 at medium effort is faster and uses fewer tokens so that you can get more tasks
+   done. Opus 5 at medium effort solves the large majority of coding tasks as well as high.
+   Run /effort to toggle.
+
+   ❯ Keep high
+     Switch Opus 5 to medium effort

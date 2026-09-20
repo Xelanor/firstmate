@@ -1,0 +1,7 @@
+# ADVERSARIAL ARM: worktree linked to a BARE repo, so the derived owner is out of scope
+git common dir: /tmp/fm-pooltrust-lab/origin.git
+derived <project>: /tmp/fm-pooltrust-lab
+$ bin/fm-claude-trust.sh /tmp/fm-pooltrust-lab/adv-wt /tmp/fm-pooltrust-lab
+error: refusing to pre-register Claude trust: project '/tmp/fm-pooltrust-lab' is not inside a git repository
+exit=1
+# store written?

@@ -1,0 +1,15 @@
+# live pooled-worktree trust arms (real maker pool, real secondmate-home clone)
+$ git -C /home/berke/.treehouse/maker-7eaf9f/1/maker rev-parse --path-format=absolute --git-common-dir
+/home/berke/.treehouse/firstmate-7bab20/1/firstmate/projects/maker/.git
+
+## OLD arm: <project> = this home's own registered clone
+$ bin/fm-claude-trust.sh /home/berke/.treehouse/maker-7eaf9f/1/maker /home/berke/.treehouse/firstmate-7bab20/2/firstmate/projects/maker
+error: refusing to pre-register Claude trust: '/home/berke/.treehouse/maker-7eaf9f/1/maker' is not a worktree of project '/home/berke/.treehouse/firstmate-7bab20/2/firstmate/projects/maker'
+exit=1
+
+## NEW arm: <project> derived from the worktree's own git common dir
+derived primary checkout: /home/berke/.treehouse/firstmate-7bab20/1/firstmate/projects/maker
+$ bin/fm-claude-trust.sh /home/berke/.treehouse/maker-7eaf9f/1/maker /home/berke/.treehouse/firstmate-7bab20/1/firstmate/projects/maker
+trusted: /home/berke/.treehouse/maker-7eaf9f/1/maker
+trusted (project root): /home/berke/.treehouse/firstmate-7bab20/1/firstmate/projects/maker
+exit=0
