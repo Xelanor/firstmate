@@ -57,10 +57,14 @@ case "${1:-}" in
     printf '%%1\n'
     exit 0 ;;
   capture-pane)
-    printf '╭────╮\n│    │\n╰────╯\n'
+    if [ -n "${FM_FAKE_TMUX_CAPTURE:-}" ] && [ -f "$FM_FAKE_TMUX_CAPTURE" ]; then
+      cat "$FM_FAKE_TMUX_CAPTURE"
+    else
+      printf '╭────╮\n│    │\n╰────╯\n'
+    fi
     exit 0 ;;
   list-windows)
-    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-ok\n' "${FM_FAKE_TMUX_WINDOW:-fm-lost}"
+    printf 'foreign:%s\nfm-mpf-lane-m8\nfm-lane-ok\nfm-stuck-lane\n' "${FM_FAKE_TMUX_WINDOW:-fm-lost}"
     exit 0 ;;
 esac
 exit 0
@@ -203,6 +207,36 @@ test_healthy_fm_id_send_still_works() {
   pass "fm-send strict: healthy fm-<id> sends record the steer and ring once"
 }
 
+# The skipped-doorbell incident: the worker's composer holds unsubmitted text,
+# so the send's ring is skipped, and that knowledge must reach the supervisor
+# durably - a signal wake naming the cannot-receive-messages condition and the
+# unblock recovery - rather than dying in this send's stderr.
+test_skipped_doorbell_records_a_durable_signal_wake() {
+  local dir fb home err log rc got queue
+  dir="$TMP_ROOT/skip-wake"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); home=$(setup_home skip-wake); err="$dir/send.err"; log="$dir/tmux.log"; : > "$log"
+  fm_write_meta "$home/state/stuck-lane.meta" "window=sess:fm-stuck-lane" "kind=ship" "harness=claude"
+  printf 'some transcript\n\xe2\x9d\xaf a doorbell line typed but never submitted\n' > "$dir/pending.capture"
+
+  PATH="$fb:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_TMUX_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_FAKE_TMUX_CAPTURE="$dir/pending.capture" \
+    "$SEND" fm-stuck-lane "second steer the worker cannot see" >/dev/null 2>"$err"; rc=$?
+  expect_code 0 "$rc" "a skipped doorbell never fails the send: the durable record IS the delivery"
+  grep -qF 'second steer the worker cannot see' "$home/state/stuck-lane.inbox/001.msg" \
+    || fail "the skipped-ring send should still record the steer durably"
+  case "$(cat "$log")" in
+    *'Firstmate instruction waiting'*) fail "the ring must not type onto pending composer text:"$'\n'"$(cat "$log")" ;;
+  esac
+  assert_contains "$(cat "$err")" "doorbell skipped" "the send should still notice the skip on stderr"
+  queue="$home/state/.wake-queue"
+  [ -s "$queue" ] || fail "the skip knowledge died in the send: no wake was queued"
+  got=$(cat "$queue")
+  assert_contains "$got" "doorbell skipped" "the wake should name the skipped-doorbell condition"
+  assert_contains "$got" "cannot receive the doorbell" "the wake should say the worker cannot receive messages"
+  assert_contains "$got" "fm-control.sh stuck-lane unblock" "the wake should name the unblock recovery"
+  pass "fm-send strict: a skipped doorbell queues a durable signal wake naming the condition and its recovery"
+}
+
 # A --key send is how firstmate interrupts a worker, so its exit status is the
 # only signal that the interrupt actually landed.
 # Reporting success for a key that was never delivered would leave supervision
@@ -239,3 +273,4 @@ test_prefixless_herdr_pane_id_fails
 test_unmatched_single_colon_target_must_exist
 test_fm_prefixed_herdr_session_is_an_explicit_target
 test_healthy_fm_id_send_still_works
+test_skipped_doorbell_records_a_durable_signal_wake

@@ -14,7 +14,11 @@
 #   4. Verb allowlist: no arbitrary text, no raw keys, no resume.
 #   5. Lifecycle states: busy interrupts first, idle does not, already-stopped
 #      is idempotent success, and an agent that does not stop fails closed.
-#   6. Marker non-regression: a control command to a kind=secondmate task
+#   6. Unblock: pending composer text is submitted with a VERIFIED Enter and
+#      the doorbell re-rings; an unreadable composer refuses without typing;
+#      a swallowed Enter on an idle pane fails loudly instead of reporting an
+#      assumed recovery; a busy turn reports the queued submit.
+#   7. Marker non-regression: a control command to a kind=secondmate task
 #      carries NO from-firstmate marker and opens no pending-reply expectation,
 #      while fm-send's marking of the same task is untouched.
 set -u
@@ -103,6 +107,13 @@ case "${1:-}" in
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
+      # Enter transition: when $D/pane-on-enter exists, delivering Enter
+      # replaces $D/pane with it - the stub harness "consumed" its input line,
+      # which is how the unblock tests drive a verified submit separately from
+      # a swallowed one (the pending-composer incident).
+      if [ "$payload" = Enter ] && [ -f "$D/pane-on-enter" ]; then
+        cp "$D/pane-on-enter" "$D/pane"
+      fi
       if [ -n "${FM_FAKE_INTERRUPT_STOPS_AGENT:-}" ] \
          && { [ "$payload" = Escape ] || [ "$payload" = C-c ]; }; then
         printf 'zsh' > "$D/command"
@@ -620,7 +631,152 @@ test_relaunch_only_flags_are_rejected_on_other_verbs() {
   pass "fm-control: profile and note flags belong to relaunch only"
 }
 
-# --- 5. lifecycle states ----------------------------------------------------
+# --- 5. unblock: the skipped-doorbell recovery --------------------------------
+#
+# The incident these pin (2026-09-20, maker home): a doorbell line sat in a
+# worker's composer with its Enter swallowed, every later steer's ring skipped
+# to protect that text, and the only remaining rung was a relaunch that risks
+# the conversation. unblock is the lighter rung: submit the stuck text with an
+# Enter that is VERIFIED to have cleared the composer, then re-ring the doorbell.
+
+# The stub's display-message answers cursor row 1, so every composer pane
+# puts its glyph row on the capture's second line. The optional third argument
+# seeds pane-on-enter, the stub's model of a harness that consumes its input
+# line on Enter; without it every Enter is swallowed (the incident shape).
+write_composer_pane() {  # <case-dir> <row-1-content|-> [on-enter-row-1-content]
+  local dir=$1 row1=${2:-} on_enter=${3:-}
+  if [ "$row1" = - ]; then : > "$dir/fake/pane"; else printf 'some transcript\n%s\n' "$row1" > "$dir/fake/pane"; fi
+  [ -z "$on_enter" ] || [ "$on_enter" = - ] \
+    || printf 'some transcript\n%s\n' "$on_enter" > "$dir/fake/pane-on-enter"
+}
+
+write_inbox_record() {  # <case-dir> <id> <text>
+  local home="$1/home" stamp
+  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  mkdir -p "$home/state/$2.inbox/handled"
+  printf 'schema=fm-task-inbox.v1\nat=%s\n--\n%s\n' "$stamp" "$3" > "$home/state/$2.inbox/001.msg"
+}
+
+write_busy_record() {  # <case-dir> <id> <state>
+  printf 'testgen1\n' > "$1/home/state/$2.busy-gen"
+  printf 'v1 gen=testgen1 seq=1 state=%s source=fm-spawn event=busy ts=1789938000\n' "$3" \
+    > "$1/home/state/$2.busy-state"
+}
+
+enter_count() {  # <case-dir>
+  grep -c '^Enter$' "$1/fake/keys" || true
+}
+
+test_unblock_submits_pending_text_and_rings() {
+  local dir out rc
+  dir=$(new_case unblock-submit)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')" "$(printf '\xe2\x9d\xaf')"
+  write_inbox_record "$dir" t1 "please continue"
+  printf '001.msg\n' > "$dir/home/state/t1.inbox/.escalated"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "unblocking a pending composer with a live agent should succeed"
+  assert_contains "$out" "unblocked t1 harness=claude backend=tmux composer=submitted ring=rang" \
+    "the outcome should report a verified submit and a landed re-ring"
+  [ "$(enter_count "$dir")" -ge 1 ] || fail "the submit Enter was never delivered"
+  assert_contains "$(literals "$dir")" "Firstmate instruction waiting" \
+    "the recovery should re-ring the doorbell for the unhandled record"
+  grep -qF 'never submitted' "$dir/fake/pane" \
+    && fail "the composer was not verified clear after the submit"
+  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
+    || fail "the recovery should reset the escalation marker so a still-unacknowledged record can resurface"
+  assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "rang" \
+    "the recovery's ring should be recorded on the ladder with its outcome"
+  pass "fm-control unblock: submits pending composer text, verifies it clear, and re-rings the doorbell"
+}
+
+test_unblock_already_clear_composer_rings_without_submitting() {
+  local dir out rc
+  dir=$(new_case unblock-clear)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf')"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "an already-clear composer is idempotent success"
+  assert_contains "$out" "composer=already-clear ring=rang" \
+    "the outcome should report nothing was submitted and the doorbell rang"
+  assert_contains "$(literals "$dir")" "Firstmate instruction waiting" \
+    "an already-clear composer should still get its unhandled record rung"
+  pass "fm-control unblock: an already-clear composer only re-rings"
+}
+
+test_unblock_refuses_when_composer_state_is_unreadable() {
+  local dir out rc
+  dir=$(new_case unblock-unknown)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "no glyph no border no shape at all"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 1 "$rc" "an unreadable composer must refuse"
+  assert_contains "$out" "refusing to guess" \
+    "the refusal should name the refuse-rather-than-guess contract"
+  [ "$(enter_count "$dir")" = 0 ] || fail "an unreadable composer must not receive any key"
+  [ -z "$(literals "$dir")" ] || fail "an unreadable composer must not be typed into"
+  pass "fm-control unblock: an unreadable composer state refuses without typing anything"
+}
+
+test_unblock_fails_loudly_when_enter_is_swallowed() {
+  local dir out rc
+  dir=$(new_case unblock-swallowed)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  # Pending text and NO pane-on-enter transition: every Enter is swallowed and
+  # the composer never clears - the exact incident shape.
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
+  expect_code 1 "$rc" "a swallowed Enter must fail rather than report an assumed recovery"
+  assert_contains "$out" "still holds its pending text" \
+    "the failure should say the text was never submitted"
+  assert_contains "$out" "relaunch" \
+    "the failure should point at the heavier rung without taking it"
+  [ "$(enter_count "$dir")" -ge 2 ] || fail "the Enter retry budget was not spent"
+  [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto still-pending text"
+  grep -qF 'never submitted' "$dir/fake/pane" \
+    || fail "the pane content changed without a verified submit"
+  pass "fm-control unblock: a swallowed Enter on an idle pane fails loudly with the pane untouched"
+}
+
+test_unblock_reports_queued_submit_behind_busy_turn() {
+  local dir out rc
+  dir=$(new_case unblock-queued)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')"
+  write_busy_record "$dir" t1 busy
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "a queued submit behind a busy turn is a bounded success"
+  assert_contains "$out" "composer=queued ring=none" \
+    "the outcome should report the queued submit and no ring onto pending text"
+  [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto a queued composer"
+  pass "fm-control unblock: a busy turn reports the submit as queued and types no doorbell"
+}
+
+test_unblock_refuses_when_no_agent_runs() {
+  local dir out rc
+  dir=$(new_case unblock-dead)
+  add_task "$dir" t1 claude
+  alive_as "$dir" zsh
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 1 "$rc" "a dead agent must refuse unblock"
+  assert_contains "$out" "no agent is running" \
+    "the refusal should say there is nothing to unblock into"
+  [ "$(enter_count "$dir")" = 0 ] || fail "a dead pane must not receive any key"
+  pass "fm-control unblock: refuses a dead agent instead of typing into a dead pane"
+}
+
+# --- 6. lifecycle states ----------------------------------------------------
 
 test_already_stopped_exit_is_idempotent() {
   local dir out rc
@@ -841,7 +997,7 @@ test_grok_idle_footer_does_not_confirm_cancellation() {
   pass "fm-control interrupt: grok's idle footer does not confirm cancellation"
 }
 
-# --- 6. marker non-regression -----------------------------------------------
+# --- 7. marker non-regression -----------------------------------------------
 
 test_secondmate_control_command_carries_no_marker() {
   local dir out rc typed home
@@ -907,6 +1063,12 @@ test_interrupt_and_exit_lock_before_task_state_resolution
 test_verb_allowlist_is_closed
 test_resume_is_refused_with_its_reason
 test_relaunch_only_flags_are_rejected_on_other_verbs
+test_unblock_submits_pending_text_and_rings
+test_unblock_already_clear_composer_rings_without_submitting
+test_unblock_refuses_when_composer_state_is_unreadable
+test_unblock_fails_loudly_when_enter_is_swallowed
+test_unblock_reports_queued_submit_behind_busy_turn
+test_unblock_refuses_when_no_agent_runs
 test_already_stopped_exit_is_idempotent
 test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop
 test_interrupt_refuses_when_no_agent_runs

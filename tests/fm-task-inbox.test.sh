@@ -279,6 +279,32 @@ test_ring_skips_dead_agent() {
   pass "inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints"
 }
 
+# The incident shape: the worker's composer holds unsubmitted text (a doorbell
+# line whose Enter was swallowed), so ringing again would type a second line
+# onto it. The ring must skip with return 1 and type nothing, leaving the
+# durable record for the ladder and the control plane's unblock verb.
+test_ring_skips_pending_composer() {
+  local dir state rec log rc
+  dir="$TMP_ROOT/ring-pending"
+  state="$dir/state"
+  mkdir -p "$state"
+  make_watch_stubs "$dir" >/dev/null
+  # The stub's display-message answers cursor row 1, so the pending composer
+  # row must be the capture's second line (a bare claude glyph row with real
+  # text behind it).
+  printf 'some transcript line\n\xe2\x9d\xaf a doorbell line typed but never submitted\n' > "$dir/pending.capture"
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+  log="$dir/send.log"; : > "$log"
+  rc=0
+  PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" \
+    FM_FAKE_TMUX_CAPTURE="$dir/pending.capture" \
+    inbox_lib "$state" fm_task_inbox_ring tmux sess:fm-t1 "$rec" fm-t1 || rc=$?
+  [ "$rc" = 1 ] || fail "a pending composer should return 1 (skip) from the ring, got $rc"
+  [ ! -s "$log" ] || fail "a pending composer was typed into:"$'\n'"$(cat "$log")"
+  [ -f "$rec" ] || fail "the skipped ring must leave the durable record in place"
+  pass "inbox: the ring skips a composer holding pending text and types nothing"
+}
+
 test_idempotent_write_dedups_exact_body() {
   local state r1 r2 r3 r4 count text
   state="$TMP_ROOT/idem/state"; mkdir -p "$state"
@@ -434,14 +460,14 @@ test_fire_and_forget_records_never_enter_the_ladder() {
   age_path "$tracked"
   action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
     inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "escalate $tracked 0" ] \
+  [ "$action" = "escalate $tracked 0 unknown" ] \
     || fail "a fire-and-forget record hid the later tracked steer: $action"
   [ -f "$fire" ] || fail "excluding fire-and-forget from escalation removed its durable record"
   pass "inbox: fire-and-forget records stay durable and outside the ladder"
 }
 
 test_ring_ladder_policy() {
-  local state rec action
+  local state rec action ladder now
   state="$TMP_ROOT/ladder/state"; mkdir -p "$state"
   rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "do the thing")
   # Within grace: quiet.
@@ -452,21 +478,42 @@ test_ring_ladder_policy() {
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "an aged unhandled message should be due a ring, got: $action"
   # A just-recorded ring holds the spacing: quiet until another grace elapses.
-  inbox_lib "$state" fm_task_inbox_record_ring "$state" t1 "$rec"
+  inbox_lib "$state" fm_task_inbox_record_ring "$state" t1 "$rec" rang
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a ring within the spacing window should be quiet, got: $action"
+  ladder=$(awk -F '\t' '{print $1 "|" $2 "|" $4 "|" NF}' "$state/t1.inbox/.ring-state" 2>/dev/null)
+  [ "$ladder" = "001.msg|1|rang|4" ] \
+    || fail "record_ring should persist <msg> <count> <epoch> <outcome>, got: $(cat "$state/t1.inbox/.ring-state" 2>/dev/null)"
   # Backdate the ladder: the next ring becomes due, and at the budget the
-  # action turns into a single escalation.
-  printf '001.msg\t1\t100\n' > "$state/t1.inbox/.ring-state"
+  # action turns into a single escalation carrying the LAST outcome.
+  now=$(date +%s)
+  printf '001.msg\t1\t%d\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "an aged ladder should ring again, got: $action"
-  printf '001.msg\t3\t100\n' > "$state/t1.inbox/.ring-state"
+  # A skipped-pending ladder escalates naming that outcome, so the caller can
+  # report the distinct cannot-receive-messages condition.
+  printf '001.msg\t3\t%d\tskipped-pending\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "escalate $rec 3" ] || fail "a spent ring budget should escalate, got: $action"
+  [ "$action" = "escalate $rec 3 skipped-pending" ] \
+    || fail "a spent ring budget skipped on pending text should escalate naming skipped-pending, got: $action"
+  # A legacy 3-field ladder (written before outcomes existed) still escalates,
+  # with unknown standing in for the unrecorded outcome.
+  printf '001.msg\t3\t%d\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "escalate $rec 3 unknown" ] \
+    || fail "a spent legacy ladder should escalate with outcome unknown, got: $action"
   # Escalation fires at most once per message.
   inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an escalated message should stay quiet for recovery, got: $action"
+  # Resetting the escalation marker re-arms surfacing for a recovery attempt,
+  # while the spent attempt budget still escalates immediately rather than
+  # silently re-ringing forever.
+  inbox_lib "$state" fm_task_inbox_reset_escalation "$state" t1
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "escalate $rec 3 unknown" ] \
+    || fail "a reset escalation marker should re-arm surfacing, got: $action"
+  inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
   # The acknowledgement resets the ladder: the next message starts fresh.
   mv "$rec" "$state/t1.inbox/handled/"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
@@ -476,7 +523,7 @@ test_ring_ladder_policy() {
   age_path "$rec"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] || fail "the next message should start a fresh ladder, got: $action"
-  pass "inbox: the re-ring ladder paces by grace, escalates once, and resets on ack"
+  pass "inbox: the re-ring ladder paces by grace, escalates once with its last outcome, and resets on ack"
 }
 
 setup_watch_case() {  # <name> -> echoes case dir; state in <dir>/state
@@ -634,11 +681,45 @@ test_watcher_escalates_once_after_budget() {
   grep -qF 'unread firstmate instruction' "$state/.wake-queue" \
     || fail "the escalation should queue a stale wake naming the unread instruction:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   grep -qF "$rec" "$state/.wake-queue" \
-    || fail "the stale wake should name the record path:"$'\n'"$(cat "$state/.wake-queue")"
+    || fail "the stale wake should name the record path:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   [ "$(grep -cF 'unread firstmate instruction' "$state/.wake-queue")" = 1 ] \
-    || fail "the escalation must fire exactly once:"$'\n'"$(cat "$state/.wake-queue")"
+    || fail "the escalation must fire exactly once:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
   grep -qF 'stale:' "$out" || fail "the watcher should exit through the ordinary stale wake:"$'\n'"$(cat "$out")"
   pass "watcher: a spent ring budget emits exactly one ordinary stale wake for recovery"
+}
+
+# The skipped-doorbell condition must surface as ITS OWN state, not as the
+# generic idle-pane possible wedge: a worker whose composer holds unsubmitted
+# text cannot receive messages and needs the control plane's unblock verb,
+# while a quiet worker that ignored rung doorbells needs inspection. The
+# watcher's escalation reason must carry that distinction.
+test_watcher_escalates_skipped_doorbell_distinctly() {
+  local dir state out log pid rec queue
+  dir=$(setup_watch_case escalate-skipped)
+  state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; : > "$log"
+  printf 'some transcript line\n\xe2\x9d\xaf a doorbell line typed but never submitted\n' > "$dir/pending.capture"
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+  age_path "$rec"
+  watch_bg "$state" "$dir/fakebin" "$out" \
+    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$dir/pending.capture" \
+    FM_TASK_INBOX_RING_MAX=1
+  pid=$!
+  wait_watcher_gone "$pid" \
+    || { kill "$pid" 2>/dev/null; fail "the watcher never escalated a skipped-doorbell budget"; }
+  [ ! -s "$log" ] || fail "a pending composer was typed into by the ladder:"$'\n'"$(cat "$log")"
+  [ -s "$state/.wake-queue" ] || fail "the skipped-doorbell escalation queued no wake"
+  grep -qF 'cannot receive messages' "$state/.wake-queue" \
+    || fail "the escalation must name the cannot-receive-messages condition:"$'\n'"$(cat "$state/.wake-queue")"
+  grep -qF 'unblock' "$state/.wake-queue" \
+    || fail "the escalation should point at the unblock recovery verb:"$'\n'"$(cat "$state/.wake-queue")"
+  case "$(cat "$state/.wake-queue")" in
+    *'with an idle pane'*) fail "the skipped-doorbell escalation must not use the generic idle-pane reason:"$'\n'"$(cat "$state/.wake-queue")" ;;
+  esac
+  [ "$(grep -cF 'cannot receive messages' "$state/.wake-queue")" = 1 ] \
+    || fail "the skipped-doorbell escalation must fire exactly once:"$'\n'"$(cat "$state/.wake-queue")"
+  grep -qF 'skipped-pending' "$state/t1.inbox/.ring-state" \
+    || fail "the ladder should record the skip outcome:"$'\n'"$(cat "$state/t1.inbox/.ring-state" 2>/dev/null)"
+  pass "watcher: a skipped doorbell escalates as its own cannot-receive-messages condition, not an idle-pane wedge"
 }
 
 test_watcher_dead_pane_escalates_once_without_ringing() {
@@ -696,6 +777,7 @@ test_write_is_durable_and_exact
 test_doorbell_is_a_shell_noop
 test_doorbell_rejects_terminal_controls
 test_ring_skips_dead_agent
+test_ring_skips_pending_composer
 test_idempotent_write_dedups_exact_body
 test_idempotent_write_follows_concurrent_ack
 test_handled_mv_dedups_by_sequence
@@ -710,5 +792,6 @@ test_watcher_quiet_on_healthy_inbox
 test_watcher_ack_silences_unwritable_ladder
 test_watcher_surfaces_unwritable_ladder
 test_watcher_escalates_once_after_budget
+test_watcher_escalates_skipped_doorbell_distinctly
 test_watcher_dead_pane_escalates_once_without_ringing
 test_watcher_dead_pane_ignores_stale_busy_state

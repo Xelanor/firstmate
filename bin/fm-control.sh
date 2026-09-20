@@ -3,6 +3,7 @@
 # lifecycle verbs addressed to an exact task id.
 #
 # Usage: fm-control.sh <task-id> interrupt
+#        fm-control.sh <task-id> unblock
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>]
@@ -26,6 +27,21 @@
 #              classify that. Cancellation is confirmed only from an adapter-
 #              owned acknowledgement and otherwise reported unconfirmed. Busy
 #              state is never rewritten as proof of the action.
+#   unblock    Restore steerability of a worker whose input line holds
+#              unsubmitted text - the skipped-doorbell condition, where every
+#              doorbell ring is skipped to protect that text and the worker
+#              cannot receive messages (bin/fm-task-inbox-lib.sh's ring;
+#              bin/fm-send.sh's skip signal). Submits the pending text with a
+#              verified Enter, then re-rings the steering-inbox doorbell so a
+#              skipped steer can land. The agent keeps running: no restart, no
+#              lost conversation, no touched worktree - the lighter rung below
+#              relaunch for exactly the state where relaunch is the wrong
+#              answer. Postcondition: the composer is PROVEN empty afterwards,
+#              or the submit is PROVEN queued behind a busy turn (the shared
+#              queued-Enter policy); the verb refuses without typing anything
+#              when it cannot read the composer state, and fails loudly when
+#              the composer still holds the text after its Enter budget on an
+#              idle pane rather than reporting an assumed recovery.
 #   exit       Stop the agent, preserving its terminal endpoint, worktree, and
 #              every uncommitted change. Interrupts first when the task reads
 #              busy, then submits the harness's exit command. Postcondition:
@@ -117,6 +133,8 @@
 #   FM_CONTROL_EXIT_WAIT         alive->dead wait after the exit command (30)
 #   FM_CONTROL_LAUNCH_WAIT       dead->alive wait after a relaunch (90)
 #   FM_CONTROL_EXIT_RETRIES      Enter retries for the exit command (3)
+#   FM_CONTROL_UNBLOCK_RETRIES   Enter retries for the unblock verb's verified
+#                                submit of pending composer text (3)
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -162,12 +180,16 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-task-inbox-lib.sh
+. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
 EXIT_WAIT=${FM_CONTROL_EXIT_WAIT:-30}
 LAUNCH_WAIT=${FM_CONTROL_LAUNCH_WAIT:-90}
 EXIT_RETRIES=${FM_CONTROL_EXIT_RETRIES:-3}
+UNBLOCK_RETRIES=${FM_CONTROL_UNBLOCK_RETRIES:-3}
+case "$UNBLOCK_RETRIES" in ''|*[!0-9]*|0) UNBLOCK_RETRIES=3 ;; esac
 
 die() {  # <message>
   echo "error: $1" >&2
@@ -462,6 +484,90 @@ do_interrupt() {
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
+}
+
+# ring_unhandled_record: re-ring the steering-inbox doorbell for the task's
+# oldest unhandled record, so the recovery completes in one action - the steer
+# that was skipped can land now instead of waiting out the watcher's re-ring
+# grace. The ring keeps its own advisory composer guard (a still-pending
+# composer is skipped, never typed over), records the ladder attempt with the
+# outcome it had, and resets the once-per-message escalation marker so a worker
+# that still never acknowledges can surface again. Prints rang|skipped|failed|
+# none; never fatal: the durable record plus the ladder own delivery from here.
+ring_unhandled_record() {
+  local rec ring_rc outcome ladder_outcome
+  rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
+  [ -n "$rec" ] || { printf 'none'; return 0; }
+  ring_rc=0
+  fm_task_inbox_ring "$BACKEND" "$T" "$rec" "$LABEL" || ring_rc=$?
+  case "$ring_rc" in
+    0) outcome=rang; ladder_outcome=rang ;;
+    1) outcome=skipped; ladder_outcome=skipped-pending ;;
+    *) outcome=failed; ladder_outcome=send-failed ;;
+  esac
+  fm_task_inbox_record_ring "$STATE" "$ID" "$rec" "$ladder_outcome" || true
+  fm_task_inbox_reset_escalation "$STATE" "$ID" || true
+  printf '%s' "$outcome"
+}
+
+# do_unblock: submit pending composer text with a VERIFIED Enter, then re-ring.
+# Prints composer=<submitted|already-clear|queued> plus ring=<...>. Every
+# refusal is loud and happens before or without guessing: an unreadable
+# composer state refuses with nothing typed, and a composer that still holds
+# the text after the Enter budget on an idle pane fails rather than reporting
+# an assumed recovery.
+do_unblock() {
+  local state cstate i=0 busy
+  state=$(agent_state)
+  case "$state" in
+    alive) ;;
+    unverified) ;;
+    dead|missing) die "no agent is running at task $ID's recorded endpoint (state: $state); the unblocked doorbell would land in a dead pane - recover the worker instead" ;;
+    *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send lifecycle input into an unattributed endpoint" ;;
+  esac
+  fm_backend_target_exists "$BACKEND" "$T" "$LABEL" \
+    || die "task $ID's endpoint disappeared; no further control action is safe"
+  cstate=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || cstate=unknown
+  case "$cstate" in
+    empty)
+      printf 'composer=already-clear ring=%s' "$(ring_unhandled_record)"
+      return 0
+      ;;
+    pending|pending-unproven) ;;
+    *)
+      die "task $ID's composer state is '${cstate:-unreadable}', so unblock cannot tell what it would submit; refusing to guess - the pending text may be a modal or a dead shell, not a stuck composer"
+      ;;
+  esac
+  while :; do
+    fm_backend_send_key "$BACKEND" "$T" Enter "$LABEL" \
+      || die "the submit Enter could not be delivered to task $ID on $BACKEND"
+    sleep "$POLL"
+    cstate=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || cstate=unknown
+    case "$cstate" in
+      empty)
+        printf 'composer=submitted ring=%s' "$(ring_unhandled_record)"
+        return 0
+        ;;
+      pending|pending-unproven) ;;
+      *)
+        die "task $ID's composer state became '$cstate' while submitting the pending text; unblock will not guess what is on screen now - inspect the pane before any retry"
+        ;;
+    esac
+    i=$((i + 1))
+    [ "$i" -lt "$UNBLOCK_RETRIES" ] || break
+  done
+  # Enter budget spent, composer still holds the text. A busy pane means the
+  # harness accepted and queued the submit behind the running turn (the shared
+  # queued-Enter policy); an idle pane is a genuine swallow.
+  case "$(busy_verdict)" in
+    busy*) busy=busy ;;
+    *) busy=idle ;;
+  esac
+  if [ "$(fm_composer_queued_enter_verdict pending "$busy")" = empty ]; then
+    printf 'composer=queued ring=none (the submit is queued behind task %s'"'"'s running turn and lands at its end)' "$ID"
+    return 0
+  fi
+  die "task $ID's composer still holds its pending text after $UNBLOCK_RETRIES verified Enter attempts on an idle pane; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation"
 }
 
 retire_busy_incarnation() {
@@ -967,6 +1073,10 @@ case "$VERB" in
     esac
     proof=$(do_interrupt)
     echo "interrupt-delivered $ID harness=$HARNESS backend=$BACKEND verified=$proof"
+    ;;
+  unblock)
+    result=$(do_unblock)
+    echo "unblocked $ID harness=$HARNESS backend=$BACKEND $result endpoint=$T"
     ;;
   exit)
     result=$(do_exit)
