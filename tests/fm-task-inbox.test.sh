@@ -496,6 +496,21 @@ test_ring_ladder_policy() {
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "escalate $rec 3 skipped-pending" ] \
     || fail "a spent ring budget skipped on pending text should escalate naming skipped-pending, got: $action"
+  # An attempt that learned nothing - an unreadable submit verdict, or a send
+  # that failed - must not erase what an earlier attempt established: the
+  # skipped-pending label has to survive, or the next escalation reverts to the
+  # generic idle-pane wording for a worker that is probably still blocked.
+  inbox_lib "$state" fm_task_inbox_record_ring "$state" t1 "$rec"
+  printf '001.msg\t3\t%d\t%s\n' "$((now - 3600))" \
+    "$(awk -F '\t' '{print $4}' "$state/t1.inbox/.ring-state")" > "$state/t1.inbox/.ring-state"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "escalate $rec 3 skipped-pending" ] \
+    || fail "an inconclusive attempt erased the skipped-pending outcome, got: $action"
+  # A different record starts a fresh ladder, outcome included.
+  inbox_lib "$state" fm_task_inbox_record_ring "$state" t1 "$state/t1.inbox/002.msg"
+  [ -z "$(awk -F '\t' '{print $4}' "$state/t1.inbox/.ring-state")" ] \
+    || fail "a new record inherited the previous record's ladder outcome"
+  printf '001.msg\t3\t%d\tskipped-pending\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
   # A legacy 3-field ladder (written before outcomes existed) still escalates,
   # with unknown standing in for the unrecorded outcome.
   printf '001.msg\t3\t%d\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"

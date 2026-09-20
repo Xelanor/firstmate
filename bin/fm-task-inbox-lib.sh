@@ -421,24 +421,30 @@ EOF
 # protected skip still consumes budget so neither an unreadable pane nor a
 # permanently blocked composer can retry silently forever. <outcome> records
 # what the attempt was (rang or skipped-pending) so a later escalation can name
-# the distinct skipped-doorbell condition; any other value, including the
-# default, records no outcome and escalates on the generic reason. A positively dead or
+# the distinct skipped-doorbell condition. Any other value, including the
+# default, means this attempt learned nothing - an unreadable submit verdict or
+# a failed send - and an inconclusive attempt must never erase what an earlier
+# one established, so the previously stored outcome is carried forward instead
+# of blanked; the generic reason is then reached only when no attempt on this
+# record ever established one. A different record starts fresh, outcome
+# included. A positively dead or
 # missing endpoint never enters the ladder: the watcher escalates it directly.
 # A concurrently removed inbox is a successful no-op; otherwise failure means
 # the caller must surface the unwritable ladder while the record remains
 # unhandled.
 fm_task_inbox_record_ring() {  # <state-dir> <task-id> <record-path> [outcome]
-  local dir base ladder rec_base count outcome=${4:-} _last _outcome_prev
+  local dir base ladder rec_base count outcome=${4:-} _last prev_outcome
   dir=$(fm_task_inbox_dir "$1" "$2")
   base=${3##*/}
   count=0
   ladder=$(cat "$dir/.ring-state" 2>/dev/null || true)
-  IFS=$(printf '\t') read -r rec_base count _last _outcome_prev <<EOF
+  IFS=$(printf '\t') read -r rec_base count _last prev_outcome <<EOF
 $ladder
 EOF
-  [ "$rec_base" = "$base" ] || count=0
+  [ "$rec_base" = "$base" ] || { count=0; prev_outcome=; }
   case "$count" in ''|*[!0-9]*) count=0 ;; esac
-  case "$outcome" in rang|skipped-pending) ;; *) outcome= ;; esac
+  case "$prev_outcome" in rang|skipped-pending) ;; *) prev_outcome= ;; esac
+  case "$outcome" in rang|skipped-pending) ;; *) outcome=$prev_outcome ;; esac
   [ -d "$dir" ] || return 0
   if ! { printf '%s\t%s\t%s\t%s\n' "$base" "$((count + 1))" "$(date +%s)" "$outcome" > "$dir/.ring-state"; } 2>/dev/null; then
     [ -d "$dir" ] || return 0
