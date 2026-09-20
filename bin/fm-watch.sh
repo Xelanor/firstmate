@@ -487,9 +487,9 @@ inbox_steer_check() {  # <window> <task>
         return 0
       fi
       case "$ring_rc" in
+        0) ring_outcome=rang ;;
         1) ring_outcome=skipped-pending ;;
-        2) ring_outcome=send-failed ;;
-        *) ring_outcome=rang ;;
+        *) ring_outcome= ;;
       esac
       if ! fm_task_inbox_record_ring "$STATE" "$task" "$rec" "$ring_outcome"; then
         if [ ! -f "$rec" ]; then
@@ -514,9 +514,6 @@ inbox_steer_check() {  # <window> <task>
       case "$outcome" in
         skipped-pending)
           reason="stale: $w (unread firstmate instruction: $rec is unhandled and the worker cannot receive messages: its input line holds unsubmitted text, so every doorbell delivery attempt was skipped. It is not an idle-pane wedge. Restore steerability in place with bin/fm-control.sh $task unblock, which submits the stuck text and re-rings without stopping the agent)"
-          ;;
-        send-failed)
-          reason="stale: $w (unread firstmate instruction: $rec is unhandled after $count doorbell delivery attempts that each failed to type into the pane; inspect the worker)"
           ;;
         *)
           reason="stale: $w (unread firstmate instruction: $rec still unhandled after $count doorbell delivery attempts with an idle pane; inspect the worker)"

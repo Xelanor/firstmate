@@ -745,6 +745,10 @@ test_unblock_fails_loudly_when_enter_is_swallowed() {
   pass "fm-control unblock: a swallowed Enter on an idle pane fails loudly with the pane untouched"
 }
 
+# A queued submit lands at the end of the running turn, so no doorbell can be
+# rung yet. The steer must still be able to surface again afterwards: the
+# once-per-message escalation marker is re-armed, otherwise the record the verb
+# exists to deliver would stay unread behind a marker that never clears.
 test_unblock_reports_queued_submit_behind_busy_turn() {
   local dir out rc
   dir=$(new_case unblock-queued)
@@ -753,12 +757,18 @@ test_unblock_reports_queued_submit_behind_busy_turn() {
   write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')"
   write_busy_record "$dir" t1 busy
   write_inbox_record "$dir" t1 "please continue"
+  printf '001.msg\n' > "$dir/home/state/t1.inbox/.escalated"
   out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
   expect_code 0 "$rc" "a queued submit behind a busy turn is a bounded success"
-  assert_contains "$out" "composer=queued ring=none" \
-    "the outcome should report the queued submit and no ring onto pending text"
+  assert_contains "$out" "composer=queued ring=deferred" \
+    "the queued outcome should name its own deliberately-not-rung doorbell state"
+  case "$out" in
+    *"ring=none"*) fail "the queued path must not reuse the nothing-to-ring label: $out" ;;
+  esac
   [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto a queued composer"
-  pass "fm-control unblock: a busy turn reports the submit as queued and types no doorbell"
+  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
+    || fail "the queued path left the escalation marker armed, so the steer can never surface again"
+  pass "fm-control unblock: a queued submit rings no doorbell and re-arms surfacing"
 }
 
 # The doorbell ring skips only on a structurally PROVEN pending composer, so an

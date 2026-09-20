@@ -29,8 +29,8 @@
 #                              (the session and the away daemon)
 #   <task>.inbox/.ring-state   watcher re-ring ladder:
 #                              "<msg>\t<count>\t<epoch>\t<last-outcome>" where
-#                              <last-outcome> is rang, skipped-pending, or
-#                              send-failed (empty for a pre-outcome ladder)
+#                              <last-outcome> is rang or skipped-pending
+#                              (empty for any other or a pre-outcome ladder)
 #   <task>.inbox/.escalated    oldest-message name already surfaced as stale,
 #                              so later polls suppress another escalation
 #
@@ -349,9 +349,9 @@ fm_task_inbox_oldest_unhandled() {  # <state-dir> <task-id>
 #                             or already escalated for the current oldest)
 #   ring <record-path>        one doorbell re-ring is due
 #   escalate <record-path> <count> <outcome>   attempt budget spent; surface as
-#                             stale, where <outcome> (rang, skipped-pending,
-#                             send-failed, or unknown for a ladder that never
-#                             recorded one) names WHY the last delivery attempt
+#                             stale, where <outcome> (rang, skipped-pending, or
+#                             unknown for a ladder that recorded neither) names
+#                             WHY the last delivery attempt
 #                             did not land, so the caller reports the distinct
 #                             skipped-doorbell condition instead of a generic
 #                             idle-pane wedge
@@ -390,7 +390,7 @@ EOF
   fi
   case "$count" in ''|*[!0-9]*) count=0 ;; esac
   case "$last" in ''|*[!0-9]*) last=0 ;; esac
-  case "$outcome" in rang|skipped-pending|send-failed) ;; *) outcome=unknown ;; esac
+  case "$outcome" in rang|skipped-pending) ;; *) outcome=unknown ;; esac
   if [ "$(cat "$dir/.escalated" 2>/dev/null || true)" = "$base" ]; then
     printf 'quiet'
     return 0
@@ -411,9 +411,9 @@ EOF
 # Advance the ladder after a delivery attempt. A failed ring or a composer-
 # protected skip still consumes budget so neither an unreadable pane nor a
 # permanently blocked composer can retry silently forever. <outcome> records
-# what the attempt was (rang, skipped-pending, send-failed) so a later
-# escalation can name the distinct skipped-doorbell condition; it defaults to
-# empty for callers that only pace the ladder. A positively dead or
+# what the attempt was (rang or skipped-pending) so a later escalation can name
+# the distinct skipped-doorbell condition; any other value, including the
+# default, records no outcome and escalates on the generic reason. A positively dead or
 # missing endpoint never enters the ladder: the watcher escalates it directly.
 # A concurrently removed inbox is a successful no-op; otherwise failure means
 # the caller must surface the unwritable ladder while the record remains
@@ -429,7 +429,7 @@ $ladder
 EOF
   [ "$rec_base" = "$base" ] || count=0
   case "$count" in ''|*[!0-9]*) count=0 ;; esac
-  case "$outcome" in rang|skipped-pending|send-failed) ;; *) outcome= ;; esac
+  case "$outcome" in rang|skipped-pending) ;; *) outcome= ;; esac
   [ -d "$dir" ] || return 0
   if ! { printf '%s\t%s\t%s\t%s\n' "$base" "$((count + 1))" "$(date +%s)" "$outcome" > "$dir/.ring-state"; } 2>/dev/null; then
     [ -d "$dir" ] || return 0
