@@ -16,8 +16,8 @@
 #      is idempotent success, and an agent that does not stop fails closed.
 #   6. Unblock: pending composer text is submitted with a VERIFIED Enter and
 #      the doorbell re-rings; an unreadable composer refuses without typing;
-#      a swallowed Enter on an idle pane fails loudly instead of reporting an
-#      assumed recovery; a busy turn reports the queued submit.
+#      a swallowed Enter fails loudly instead of reporting an assumed
+#      recovery.
 #   7. Marker non-regression: a control command to a kind=secondmate task
 #      carries NO from-firstmate marker and opens no pending-reply expectation,
 #      while fm-send's marking of the same task is untouched.
@@ -657,12 +657,6 @@ write_inbox_record() {  # <case-dir> <id> <text>
   printf 'schema=fm-task-inbox.v1\nat=%s\n--\n%s\n' "$stamp" "$3" > "$home/state/$2.inbox/001.msg"
 }
 
-write_busy_record() {  # <case-dir> <id> <state>
-  printf 'testgen1\n' > "$1/home/state/$2.busy-gen"
-  printf 'v1 gen=testgen1 seq=1 state=%s source=fm-spawn event=busy ts=1789938000\n' "$3" \
-    > "$1/home/state/$2.busy-state"
-}
-
 enter_count() {  # <case-dir>
   grep -c '^Enter$' "$1/fake/keys" || true
 }
@@ -745,37 +739,10 @@ test_unblock_fails_loudly_when_enter_is_swallowed() {
   pass "fm-control unblock: a swallowed Enter on an idle pane fails loudly with the pane untouched"
 }
 
-# A queued submit lands at the end of the running turn, so no doorbell can be
-# rung yet. The steer must still be able to surface again afterwards: the
-# once-per-message escalation marker is re-armed, otherwise the record the verb
-# exists to deliver would stay unread behind a marker that never clears.
-test_unblock_reports_queued_submit_behind_busy_turn() {
-  local dir out rc
-  dir=$(new_case unblock-queued)
-  add_task "$dir" t1 claude
-  alive_as "$dir" claude
-  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')"
-  write_busy_record "$dir" t1 busy
-  write_inbox_record "$dir" t1 "please continue"
-  printf '001.msg\n' > "$dir/home/state/t1.inbox/.escalated"
-  out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
-  expect_code 0 "$rc" "a queued submit behind a busy turn is a bounded success"
-  assert_contains "$out" "composer=queued ring=deferred" \
-    "the queued outcome should name its own deliberately-not-rung doorbell state"
-  case "$out" in
-    *"ring=none"*) fail "the queued path must not reuse the nothing-to-ring label: $out" ;;
-  esac
-  [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto a queued composer"
-  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
-    || fail "the queued path left the escalation marker armed, so the steer can never surface again"
-  pass "fm-control unblock: a queued submit rings no doorbell and re-arms surfacing"
-}
-
 # The doorbell ring skips only on a structurally PROVEN pending composer, so an
 # unproven read can never be the skipped-doorbell condition unblock recovers.
 # An Enter there could be answering an overlay rather than submitting a stuck
-# line, so it must refuse with nothing delivered - even on a busy pane, where
-# the queued-Enter policy would otherwise report a queued submit.
+# line, so it must refuse with nothing delivered.
 test_unblock_refuses_an_unproven_composer_without_typing() {
   local dir out rc
   dir=$(new_case unblock-unproven-busy)
@@ -786,13 +753,9 @@ test_unblock_refuses_an_unproven_composer_without_typing() {
   # ambiguous and the verdict is pending-unproven rather than pending.
   printf '\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n\xe2\x94\x82 a doorbell line typed but never submitted \xe2\x94\x82\n\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xaf\n' \
     > "$dir/fake/pane"
-  write_busy_record "$dir" t1 busy
   write_inbox_record "$dir" t1 "please continue"
   out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
   expect_code 1 "$rc" "an unproven composer must refuse rather than be typed into"
-  case "$out" in
-    *composer=queued*) fail "unblock claimed a queued submit it never proved: $out" ;;
-  esac
   assert_contains "$out" "pending-unproven" \
     "the refusal should name the composer state it actually observed"
   assert_contains "$out" "modal or a dead shell" \
@@ -1108,7 +1071,6 @@ test_unblock_submits_pending_text_and_rings
 test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
 test_unblock_fails_loudly_when_enter_is_swallowed
-test_unblock_reports_queued_submit_behind_busy_turn
 test_unblock_refuses_an_unproven_composer_without_typing
 test_unblock_refuses_when_no_agent_runs
 test_already_stopped_exit_is_idempotent
