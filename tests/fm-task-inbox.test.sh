@@ -79,6 +79,12 @@ case "${1:-}" in
       if [ -n "${FM_ACK_RECORD:-}" ] && [ -f "$FM_ACK_RECORD" ]; then
         mv "$FM_ACK_RECORD" "${FM_ACK_RECORD%/*}/handled/"
       fi
+      # A harness that takes the typed text but swallows its Enter: the pane
+      # the ring reads afterwards shows the doorbell still in the composer.
+      if [ -n "${FM_FAKE_TMUX_SWALLOW:-}" ] && [ -f "$FM_FAKE_TMUX_SWALLOW" ] \
+         && [ -n "${FM_FAKE_TMUX_CAPTURE:-}" ]; then
+        cat "$FM_FAKE_TMUX_SWALLOW" > "$FM_FAKE_TMUX_CAPTURE"
+      fi
     fi
     exit 0 ;;
   display-message)
@@ -772,6 +778,41 @@ test_watcher_escalates_skipped_doorbell_distinctly() {
   pass "watcher: a skipped doorbell escalates as its own cannot-receive-messages condition, not an idle-pane wedge"
 }
 
+# The 2026-09-20 incident shape exactly: earlier attempts rang a genuinely
+# empty composer, and the LAST one types its doorbell into an empty composer
+# whose harness then swallows the Enter. The ring returns 0 - the keystrokes
+# reached the pane - but its submit verdict reads pending, so the worker is now
+# in the cannot-receive-messages condition. The escalation must say so; the
+# attempt budget is spent, so nothing later can re-derive the right label.
+test_watcher_escalates_a_swallowed_final_ring_as_skipped_pending() {
+  local dir state out log pid rec
+  dir=$(setup_watch_case escalate-swallowed-final)
+  state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; : > "$log"
+  printf 'some transcript line\n\xe2\x9d\xaf : Firstmate instruction waiting\n' > "$dir/swallowed.capture"
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+  age_path "$rec"
+  # One earlier attempt that rang cleanly, so the stored outcome is `rang` and a
+  # merely-inconclusive final attempt would carry that forward instead.
+  printf '%s\t1\t%s\trang\n' "${rec##*/}" "$(( $(date +%s) - 3600 ))" \
+    > "$state/t1.inbox/.ring-state"
+  watch_bg "$state" "$dir/fakebin" "$out" \
+    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    FM_FAKE_TMUX_SWALLOW="$dir/swallowed.capture" FM_TASK_INBOX_RING_MAX=2
+  pid=$!
+  wait_watcher_gone "$pid" \
+    || { kill "$pid" 2>/dev/null; fail "the watcher never escalated the swallowed final ring"; }
+  grep -qF 'Firstmate instruction waiting' "$log" \
+    || fail "the final attempt should have typed its doorbell:"$'\n'"$(cat "$log")"
+  grep -qF 'skipped-pending' "$state/t1.inbox/.ring-state" \
+    || fail "a swallowed submit must be recorded as skipped-pending:"$'\n'"$(cat "$state/t1.inbox/.ring-state" 2>/dev/null)"
+  grep -qF 'cannot receive messages' "$state/.wake-queue" \
+    || fail "the escalation must name the cannot-receive-messages condition:"$'\n'"$(cat "$state/.wake-queue" 2>/dev/null)"
+  case "$(cat "$state/.wake-queue")" in
+    *'with an idle pane'*) fail "a swallowed doorbell must not escalate as a generic idle-pane wedge:"$'\n'"$(cat "$state/.wake-queue")" ;;
+  esac
+  pass "watcher: a doorbell whose Enter was swallowed escalates as cannot-receive-messages, not an idle-pane wedge"
+}
+
 test_watcher_dead_pane_escalates_once_without_ringing() {
   local dir state out log pid rec
   dir=$(setup_watch_case dead-pane)
@@ -843,5 +884,6 @@ test_watcher_ack_silences_unwritable_ladder
 test_watcher_surfaces_unwritable_ladder
 test_watcher_escalates_once_after_budget
 test_watcher_escalates_skipped_doorbell_distinctly
+test_watcher_escalates_a_swallowed_final_ring_as_skipped_pending
 test_watcher_dead_pane_escalates_once_without_ringing
 test_watcher_dead_pane_ignores_stale_busy_state

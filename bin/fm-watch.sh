@@ -450,7 +450,7 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # too: their pane-staleness exemption is about quiet panes being healthy,
 # while an unacknowledged instruction past the ladder is a stuck steer.
 inbox_steer_check() {  # <window> <task>
-  local w=$1 task=$2 action verb rec count outcome ring_rc ring_outcome backend agent_state reason
+  local w=$1 task=$2 action verb rec count outcome ring_rc ring_outcome= backend agent_state reason
   local tail40
   action=$(fm_task_inbox_due_action "$STATE" "$task") || return 0
   verb=${action%% *}
@@ -487,7 +487,13 @@ inbox_steer_check() {  # <window> <task>
         return 0
       fi
       case "$ring_rc" in
-        0) ring_outcome=rang ;;
+        0)
+          case "$FM_TASK_INBOX_RING_VERDICT" in
+            empty) ring_outcome=rang ;;
+            pending) ring_outcome=skipped-pending ;;
+            *) ring_outcome= ;;
+          esac
+          ;;
         1) ring_outcome=skipped-pending ;;
         *) ring_outcome= ;;
       esac
