@@ -340,10 +340,9 @@ pass "real herdr: an agent behind an unproven composer fails closed instead of t
 # The 2026-09-20 incident shape, replayed deterministically on a real herdr
 # pane (no real harness - the live-harness proof lives in
 # tests/fm-unblock-doorbell-herdr-live-e2e.test.sh): a composer holding typed
-# but unsubmitted text makes every steering-inbox doorbell skip, the send's
-# knowledge must survive durably as a wake, and the control plane's unblock
-# verb must submit that text with a verified Enter and land the skipped
-# doorbell - no relaunch, nothing discarded.
+# but unsubmitted text makes every steering-inbox doorbell skip, and the
+# control plane's unblock verb must submit that text with a verified Enter and
+# land the skipped doorbell - no relaunch, nothing discarded.
 #
 # The pane runs the same single-char composer loop technique as
 # tests/fm-afk-inject-herdr-e2e.test.sh: it draws a bare claude-glyph composer
@@ -462,8 +461,7 @@ sleep 0.3
 [ "$(fm_backend_herdr_composer_state "$SESSION:$USMOKE_PANE_ID")" = pending ] \
   || fail "the smoke pane's composer did not read pending after the unsubmitted literal, got '$(fm_backend_herdr_composer_state "$SESSION:$USMOKE_PANE_ID")'"
 
-# A steer now records durably but its doorbell skips, and that knowledge must
-# survive the send as a durable signal wake naming the condition and recovery.
+# A steer now records durably but its doorbell skips.
 USMOKE_ERR="$USMOKE_DIR/send.err"
 if ! env FM_HOME="$HOME_DIR" HERDR_SESSION="$SESSION" FM_SPAWN_NO_GUARD=1 \
   "$ROOT/bin/fm-send.sh" usmoke "a steer the worker cannot receive" >/dev/null 2> "$USMOKE_ERR"; then
@@ -472,13 +470,8 @@ fi
 grep -qF 'doorbell skipped' "$USMOKE_ERR" \
   || fail "fm-send should report the skipped doorbell: $(cat "$USMOKE_ERR")"
 [ -f "$HOME_DIR/state/usmoke.inbox/001.msg" ] || fail "the skipped send must leave the durable record"
-[ -s "$HOME_DIR/state/.wake-queue" ] || fail "the skip knowledge died in the send: no wake queued"
-grep -qF 'doorbell skipped' "$HOME_DIR/state/.wake-queue" \
-  || fail "the queued wake should name the skipped-doorbell condition"
-grep -qF 'cannot receive the doorbell' "$HOME_DIR/state/.wake-queue" \
-  || fail "the queued wake should say the worker cannot receive messages"
 [ ! -s "$USMOKE_LOG" ] || fail "nothing may be submitted while the doorbell skips: $(cat "$USMOKE_LOG")"
-pass "real herdr: a steer to a pending composer records durably, skips its doorbell, and queues the skip wake"
+pass "real herdr: a steer to a pending composer records durably and skips its doorbell"
 
 # The recovery: submit the stuck text with a verified Enter and land the doorbell.
 OUT=$(env FM_HOME="$HOME_DIR" HERDR_SESSION="$SESSION" FM_SPAWN_NO_GUARD=1 \

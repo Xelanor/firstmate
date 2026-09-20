@@ -1009,7 +1009,7 @@ ok - live arc step 1-2: Claude Code (2.1.278 (Claude Code)) on herdr 0.8.2 holds
 ok - live Herdr unblock recovery: Claude Code (2.1.278 (Claude Code)) on herdr 0.8.2 - the stuck doorbell was submitted, the same skipped steer landed, and the worker acknowledged it, with no relaunch
 ```
 
-The harness-independent halves - the ring's skip on proven pending text, the ladder's outcome-carrying escalation, the send's durable skip wake, and the unblock verb's verdict/refusal/queued logic on the reference tmux backend - are pinned portably by `tests/fm-task-inbox.test.sh`, `tests/fm-send-strict.test.sh`, and `tests/fm-control.test.sh`, and against real Herdr without model tokens by `tests/fm-control-herdr-smoke.test.sh`.
+The harness-independent halves - the ring's skip on proven pending text, the ladder's outcome-carrying escalation, and the unblock verb's verdict/refusal/queued logic on the reference tmux backend - are pinned portably by `tests/fm-task-inbox.test.sh`, `tests/fm-send-strict.test.sh`, and `tests/fm-control.test.sh`, and against real Herdr without model tokens by `tests/fm-control-herdr-smoke.test.sh`.
 
 ### Prune and respawn
 

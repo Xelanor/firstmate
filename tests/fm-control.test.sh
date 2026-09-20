@@ -761,6 +761,32 @@ test_unblock_reports_queued_submit_behind_busy_turn() {
   pass "fm-control unblock: a busy turn reports the submit as queued and types no doorbell"
 }
 
+# A composer that is only structurally UNPROVEN pending is not proof that the
+# harness queued the Enter, so a busy turn must not upgrade it to a reported
+# queued submit: that would claim a recovery that was never observed.
+test_unblock_refuses_queued_claim_for_unproven_composer_on_busy_turn() {
+  local dir out rc
+  dir=$(new_case unblock-unproven-busy)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  # A box composer opening on the capture's first row: the pending text is
+  # visible but its shape runs off the top of the capture, so the geometry is
+  # ambiguous and the verdict is pending-unproven rather than pending.
+  printf '\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n\xe2\x94\x82 a doorbell line typed but never submitted \xe2\x94\x82\n\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xaf\n' \
+    > "$dir/fake/pane"
+  write_busy_record "$dir" t1 busy
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
+  expect_code 1 "$rc" "an unproven composer must not be reported as a queued submit"
+  case "$out" in
+    *composer=queued*) fail "unblock claimed a queued submit it never proved: $out" ;;
+  esac
+  assert_contains "$out" "pending-unproven" \
+    "the refusal should name the composer state it actually observed"
+  [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto still-pending text"
+  pass "fm-control unblock: a busy turn does not convert an unproven composer into a queued submit"
+}
+
 test_unblock_refuses_when_no_agent_runs() {
   local dir out rc
   dir=$(new_case unblock-dead)
@@ -1068,6 +1094,7 @@ test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
 test_unblock_fails_loudly_when_enter_is_swallowed
 test_unblock_reports_queued_submit_behind_busy_turn
+test_unblock_refuses_queued_claim_for_unproven_composer_on_busy_turn
 test_unblock_refuses_when_no_agent_runs
 test_already_stopped_exit_is_idempotent
 test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop

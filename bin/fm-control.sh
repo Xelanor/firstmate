@@ -40,8 +40,8 @@
 #              or the submit is PROVEN queued behind a busy turn (the shared
 #              queued-Enter policy); the verb refuses without typing anything
 #              when it cannot read the composer state, and fails loudly when
-#              the composer still holds the text after its Enter budget on an
-#              idle pane rather than reporting an assumed recovery.
+#              the composer still holds the text after its Enter budget
+#              without that proof, rather than reporting an assumed recovery.
 #   exit       Stop the agent, preserving its terminal endpoint, worktree, and
 #              every uncommitted change. Interrupts first when the task reads
 #              busy, then submits the harness's exit command. Postcondition:
@@ -514,8 +514,9 @@ ring_unhandled_record() {
 # Prints composer=<submitted|already-clear|queued> plus ring=<...>. Every
 # refusal is loud and happens before or without guessing: an unreadable
 # composer state refuses with nothing typed, and a composer that still holds
-# the text after the Enter budget on an idle pane fails rather than reporting
-# an assumed recovery.
+# the text after the Enter budget fails rather than reporting an assumed
+# recovery unless the shared queued-Enter policy proves the submit is queued,
+# which needs BOTH a structurally proven pending composer and a busy pane.
 do_unblock() {
   local state cstate i=0 busy
   state=$(agent_state)
@@ -556,18 +557,19 @@ do_unblock() {
     i=$((i + 1))
     [ "$i" -lt "$UNBLOCK_RETRIES" ] || break
   done
-  # Enter budget spent, composer still holds the text. A busy pane means the
-  # harness accepted and queued the submit behind the running turn (the shared
-  # queued-Enter policy); an idle pane is a genuine swallow.
+  # Enter budget spent, composer still holds the text. A structurally proven
+  # pending composer on a busy pane means the harness accepted and queued the
+  # submit behind the running turn (the shared queued-Enter policy); anything
+  # else - including a pending-unproven read - is not that proof.
   case "$(busy_verdict)" in
     busy*) busy=busy ;;
     *) busy=idle ;;
   esac
-  if [ "$(fm_composer_queued_enter_verdict pending "$busy")" = empty ]; then
+  if [ "$(fm_composer_queued_enter_verdict "$cstate" "$busy")" = empty ]; then
     printf 'composer=queued ring=none (the submit is queued behind task %s'"'"'s running turn and lands at its end)' "$ID"
     return 0
   fi
-  die "task $ID's composer still holds its pending text after $UNBLOCK_RETRIES verified Enter attempts on an idle pane; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation"
+  die "task $ID's composer still holds its pending text (state: $cstate) after $UNBLOCK_RETRIES verified Enter attempts on a pane reading $busy; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation"
 }
 
 retire_busy_incarnation() {

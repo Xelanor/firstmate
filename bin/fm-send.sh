@@ -56,10 +56,7 @@
 # re-ring ladder. The composer pre-check before the ring is ADVISORY only: when
 # the composer visibly holds pending text the ring is skipped with a notice and
 # the watcher re-rings an ordinary record later; no composer verdict is
-# delivery proof on this plane, and a failed ring never fails the send. A skip
-# is also recorded durably as a signal wake naming the cannot-receive-messages
-# condition (fm_send_note_doorbell_skip), so the supervisor learns it from the
-# next drain rather than only from this send's stderr.
+# delivery proof on this plane, and a failed ring never fails the send.
 #
 # TYPED - the LOCAL text that must reach the terminal itself: a harness-native
 # invocation (a leading "/", or a leading "$" to a codex target) must reach
@@ -332,22 +329,6 @@ fm_send_meta_for_key_value() { # <state-dir> <key> <value>
     return 0
   done
   return 1
-}
-
-# fm_send_note_doorbell_skip: the enqueue-time ring was skipped because the
-# worker's composer PROVENLY holds pending text, so the worker cannot receive
-# the doorbell and will not read this steer until that text is submitted or
-# cleared. That is a distinct condition from a quiet worker, and the send's
-# stderr notice alone dies with the invoking turn, so record it durably as a
-# signal wake the supervisor reads at the next drain. The re-ring ladder still
-# owns delivery; this wake only makes the condition visible as itself, early.
-# Best-effort by the same contract as the ring: a failed append warns and never
-# fails the send.
-fm_send_note_doorbell_skip() { # <task-id> <record-path>
-  if ! fm_wake_append signal "$1.status" \
-    "signal: fm-$1 (doorbell skipped: the worker's input line holds unsubmitted text, so it cannot receive the doorbell for the steer recorded at $2. The watcher will re-ring; if the skip keeps repeating, restore steerability in place with bin/fm-control.sh $1 unblock, which submits the stuck text without stopping the agent)"; then
-    echo "warning: the doorbell skip could not be recorded durably for $1; the watcher's re-ring ladder still owns delivery" >&2
-  fi
 }
 
 fm_send_count_colons() { # <string>
@@ -1104,10 +1085,7 @@ else
     ring_rc=0
     fm_task_inbox_ring "$TARGET_BACKEND" "$T" "$INBOX_RECORD" "$EXPECTED_LABEL" || ring_rc=$?
     case "$ring_rc" in
-    1)
-      echo "fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and the watcher will re-ring" >&2
-      fm_send_note_doorbell_skip "$INBOX_TASK_ID" "$INBOX_RECORD" || true
-      ;;
+    1) echo "fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and the watcher will re-ring" >&2 ;;
     2) echo "fm-send: doorbell did not reach $T; the steer is durably recorded at $INBOX_RECORD and the watcher will re-ring" >&2 ;;
     3) echo "fm-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac

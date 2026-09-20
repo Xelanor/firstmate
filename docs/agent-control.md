@@ -51,7 +51,7 @@ The clear is refused before anything is sent when the recorded backend cannot de
 ## The skipped-doorbell condition and its recovery
 
 A worker whose input line holds typed but unsubmitted text - a doorbell whose Enter was swallowed, most often - cannot receive messages: every later doorbell ring is skipped to protect that text from being concatenated onto, while the steers themselves stay durable in the steering inbox ( [`bin/fm-task-inbox-lib.sh`](../bin/fm-task-inbox-lib.sh) ).
-The condition is reported as itself, never as a quiet worker: `bin/fm-send.sh` queues a signal wake naming the skip at send time, and the watcher's re-ring ladder escalates naming the last attempt's outcome (`skipped-pending`) and pointing at `unblock`, rather than the generic idle-pane wording that reads as a possible wedge.
+The condition is reported as itself, never as a quiet worker: `bin/fm-send.sh` names the skip on its own stderr, and the watcher's re-ring ladder escalates naming the last attempt's outcome (`skipped-pending`) and pointing at `unblock`, rather than the generic idle-pane wording that reads as a possible wedge.
 Those are opposite conditions with opposite responses - one needs `unblock` in place, the other needs inspection or recovery - so the wake must distinguish them.
 
 `unblock` is the rung below `relaunch` for exactly this state, where relaunch is the wrong answer because it discards the conversation while the work is intact.

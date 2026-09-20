@@ -14,9 +14,8 @@
 #
 #   1. A real doorbell line is typed into the worker's composer WITHOUT
 #      submitting it - the exact stuck state the incident left behind.
-#   2. A real fm-send steer records durably but its doorbell SKIPS, the skip
-#      knowledge survives as a durable signal wake, and the worker receives
-#      nothing.
+#   2. A real fm-send steer records durably but its doorbell SKIPS, and the
+#      worker receives nothing.
 #   3. The control plane's unblock verb submits the stuck doorbell text with a
 #      VERIFIED Enter, and the SAME previously-skipped steer lands: the worker
 #      reads the inbox records and acknowledges them with the mv.
@@ -188,11 +187,6 @@ grep -qF 'doorbell skipped' "$SEND_ERR" \
   || fail "fm-send did not report the skipped doorbell: $(cat "$SEND_ERR")"
 REC2="$HOME_DIR/state/$TASK.inbox/002.msg"
 [ -f "$REC2" ] || fail "the skipped steer did not leave its durable record"
-[ -s "$HOME_DIR/state/.wake-queue" ] || fail "the skip knowledge died in the send"
-grep -qF 'doorbell skipped' "$HOME_DIR/state/.wake-queue" \
-  || fail "the durable wake does not name the skipped-doorbell condition"
-grep -qF 'cannot receive the doorbell' "$HOME_DIR/state/.wake-queue" \
-  || fail "the durable wake does not say the worker cannot receive messages"
 sleep 5
 [ ! -e "$ACTED" ] && [ ! -e "$ACTED2" ] \
   || fail "the worker acted on a steer whose doorbell never landed"
