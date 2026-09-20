@@ -761,10 +761,12 @@ test_unblock_reports_queued_submit_behind_busy_turn() {
   pass "fm-control unblock: a busy turn reports the submit as queued and types no doorbell"
 }
 
-# A composer that is only structurally UNPROVEN pending is not proof that the
-# harness queued the Enter, so a busy turn must not upgrade it to a reported
-# queued submit: that would claim a recovery that was never observed.
-test_unblock_refuses_queued_claim_for_unproven_composer_on_busy_turn() {
+# The doorbell ring skips only on a structurally PROVEN pending composer, so an
+# unproven read can never be the skipped-doorbell condition unblock recovers.
+# An Enter there could be answering an overlay rather than submitting a stuck
+# line, so it must refuse with nothing delivered - even on a busy pane, where
+# the queued-Enter policy would otherwise report a queued submit.
+test_unblock_refuses_an_unproven_composer_without_typing() {
   local dir out rc
   dir=$(new_case unblock-unproven-busy)
   add_task "$dir" t1 claude
@@ -777,14 +779,17 @@ test_unblock_refuses_queued_claim_for_unproven_composer_on_busy_turn() {
   write_busy_record "$dir" t1 busy
   write_inbox_record "$dir" t1 "please continue"
   out=$(FM_CONTROL_UNBLOCK_RETRIES=2 run_control "$dir" t1 unblock); rc=$?
-  expect_code 1 "$rc" "an unproven composer must not be reported as a queued submit"
+  expect_code 1 "$rc" "an unproven composer must refuse rather than be typed into"
   case "$out" in
     *composer=queued*) fail "unblock claimed a queued submit it never proved: $out" ;;
   esac
   assert_contains "$out" "pending-unproven" \
     "the refusal should name the composer state it actually observed"
+  assert_contains "$out" "modal or a dead shell" \
+    "the refusal should give the refuse-rather-than-guess reason"
+  [ "$(enter_count "$dir")" = 0 ] || fail "no Enter may be delivered to an unproven composer"
   [ -z "$(literals "$dir")" ] || fail "no doorbell may be typed onto still-pending text"
-  pass "fm-control unblock: a busy turn does not convert an unproven composer into a queued submit"
+  pass "fm-control unblock: an unproven composer refuses with nothing delivered"
 }
 
 test_unblock_refuses_when_no_agent_runs() {
@@ -1094,7 +1099,7 @@ test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
 test_unblock_fails_loudly_when_enter_is_swallowed
 test_unblock_reports_queued_submit_behind_busy_turn
-test_unblock_refuses_queued_claim_for_unproven_composer_on_busy_turn
+test_unblock_refuses_an_unproven_composer_without_typing
 test_unblock_refuses_when_no_agent_runs
 test_already_stopped_exit_is_idempotent
 test_missing_tmux_endpoint_refuses_rather_than_claiming_a_stop

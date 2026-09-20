@@ -175,7 +175,7 @@ done
 [ "$st" = pending ] \
   || fail "the live composer never read pending after the unsubmitted doorbell (verdict '$st')"
 
-# 2. A steer whose doorbell must skip, with the skip knowledge surviving durably.
+# 2. A steer whose doorbell must skip on the pending text.
 SEND_ERR="$TMP_ROOT/send.err"
 if ! env FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$HOME_DIR" \
   "$ROOT/bin/fm-send.sh" "$TASK" \

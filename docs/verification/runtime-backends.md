@@ -994,7 +994,7 @@ ok - live Herdr submit confirm: Claude Code (2.1.236 (Claude Code)) on herdr 0.8
 
 ### Skipped-doorbell recovery
 
-Measured 2026-09-21 against Herdr 0.8.2 and Claude Code 2.1.278 in an isolated `fm-lab-` session, replaying the 2026-09-20 maker-home incident end to end: a real doorbell line typed into the worker's composer without submitting it, a later `fm-send` steer whose ring skipped on that pending text while the skip knowledge survived as a durable signal wake, and `fm-control.sh <task> unblock` submitting the stuck text with a verified Enter so the same previously-skipped steer landed and was acknowledged with the `mv` - no relaunch, the agent never stopped.
+Measured 2026-09-21 against Herdr 0.8.2 and Claude Code 2.1.278 in an isolated `fm-lab-` session, replaying the 2026-09-20 maker-home incident end to end: a real doorbell line typed into the worker's composer without submitting it, a later `fm-send` steer whose ring skipped on that pending text, and `fm-control.sh <task> unblock` submitting the stuck text with a verified Enter so the same previously-skipped steer landed and was acknowledged with the `mv` - no relaunch, the agent never stopped.
 
 Refresh the live proof with (spends a small number of real model tokens):
 

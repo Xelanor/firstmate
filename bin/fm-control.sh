@@ -30,18 +30,18 @@
 #   unblock    Restore steerability of a worker whose input line holds
 #              unsubmitted text - the skipped-doorbell condition, where every
 #              doorbell ring is skipped to protect that text and the worker
-#              cannot receive messages (bin/fm-task-inbox-lib.sh's ring;
-#              bin/fm-send.sh's skip signal). Submits the pending text with a
-#              verified Enter, then re-rings the steering-inbox doorbell so a
+#              cannot receive messages (bin/fm-task-inbox-lib.sh's ring).
+#              Submits the PROVEN pending text with a verified Enter, then re-rings the steering-inbox doorbell so a
 #              skipped steer can land. The agent keeps running: no restart, no
 #              lost conversation, no touched worktree - the lighter rung below
 #              relaunch for exactly the state where relaunch is the wrong
 #              answer. Postcondition: the composer is PROVEN empty afterwards,
 #              or the submit is PROVEN queued behind a busy turn (the shared
 #              queued-Enter policy); the verb refuses without typing anything
-#              when it cannot read the composer state, and fails loudly when
-#              the composer still holds the text after its Enter budget
-#              without that proof, rather than reporting an assumed recovery.
+#              on any verdict but a structurally proven `pending` - including
+#              `pending-unproven`, which the ring never skips on - and fails
+#              loudly when the composer still holds the text after its Enter
+#              budget, rather than reporting an assumed recovery.
 #   exit       Stop the agent, preserving its terminal endpoint, worktree, and
 #              every uncommitted change. Interrupts first when the task reads
 #              busy, then submits the harness's exit command. Postcondition:
@@ -512,13 +512,13 @@ ring_unhandled_record() {
 
 # do_unblock: submit pending composer text with a VERIFIED Enter, then re-ring.
 # Prints composer=<submitted|already-clear|queued> plus ring=<...>. Every
-# refusal is loud and happens before or without guessing: an unreadable
-# composer state refuses with nothing typed, and a composer that still holds
+# refusal is loud and happens before or without guessing: only the exact
+# `pending` verdict - the one the ring itself skips on - is typed into, any
+# other verdict refuses with nothing typed, and a composer that still holds
 # the text after the Enter budget fails rather than reporting an assumed
-# recovery unless the shared queued-Enter policy proves the submit is queued,
-# which needs BOTH a structurally proven pending composer and a busy pane.
+# recovery unless the shared queued-Enter policy proves the submit is queued.
 do_unblock() {
-  local state cstate i=0 busy
+  local state cstate i=0 busy verdict
   state=$(agent_state)
   case "$state" in
     alive) ;;
@@ -534,9 +534,9 @@ do_unblock() {
       printf 'composer=already-clear ring=%s' "$(ring_unhandled_record)"
       return 0
       ;;
-    pending|pending-unproven) ;;
+    pending) ;;
     *)
-      die "task $ID's composer state is '${cstate:-unreadable}', so unblock cannot tell what it would submit; refusing to guess - the pending text may be a modal or a dead shell, not a stuck composer"
+      die "task $ID's composer state is '${cstate:-unreadable}' rather than a structurally proven 'pending', so unblock cannot tell what it would submit; refusing to guess - the pending text may be a modal or a dead shell, not a stuck composer"
       ;;
   esac
   while :; do
@@ -549,7 +549,7 @@ do_unblock() {
         printf 'composer=submitted ring=%s' "$(ring_unhandled_record)"
         return 0
         ;;
-      pending|pending-unproven) ;;
+      pending) ;;
       *)
         die "task $ID's composer state became '$cstate' while submitting the pending text; unblock will not guess what is on screen now - inspect the pane before any retry"
         ;;
@@ -557,11 +557,11 @@ do_unblock() {
     i=$((i + 1))
     [ "$i" -lt "$UNBLOCK_RETRIES" ] || break
   done
-  # Enter budget spent, composer still holds the text. A structurally proven
-  # pending composer on a busy pane means the harness accepted and queued the
-  # submit behind the running turn (the shared queued-Enter policy); anything
-  # else - including a pending-unproven read - is not that proof.
-  case "$(busy_verdict)" in
+  # Enter budget spent, composer still holds the text. A busy pane means the
+  # harness accepted and queued the submit behind the running turn (the shared
+  # queued-Enter policy); anything else is a genuine swallow.
+  verdict=$(busy_verdict)
+  case "$verdict" in
     busy*) busy=busy ;;
     *) busy=idle ;;
   esac
@@ -569,7 +569,7 @@ do_unblock() {
     printf 'composer=queued ring=none (the submit is queued behind task %s'"'"'s running turn and lands at its end)' "$ID"
     return 0
   fi
-  die "task $ID's composer still holds its pending text (state: $cstate) after $UNBLOCK_RETRIES verified Enter attempts on a pane reading $busy; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation"
+  die "task $ID's composer still holds its pending text after $UNBLOCK_RETRIES verified Enter attempts on a pane reading ${verdict%% *}; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation"
 }
 
 retire_busy_incarnation() {
