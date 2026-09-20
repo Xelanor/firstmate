@@ -354,11 +354,8 @@ fm_task_inbox_oldest_unhandled() {  # <state-dir> <task-id>
 }
 
 # The re-ring ladder decision for one task. Prints exactly one of:
-#   quiet                     nothing due (healthy, within grace or spacing -
-#                             which paces the escalation too, so a just-made
-#                             attempt gets its grace period to be acknowledged
-#                             before surfacing as stale - or already escalated
-#                             for the current oldest)
+#   quiet                     nothing due (healthy, within grace or spacing,
+#                             or already escalated for the current oldest)
 #   ring <record-path>        one doorbell re-ring is due
 #   escalate <record-path> <count> <outcome>   attempt budget spent; surface as
 #                             stale, where <outcome> (rang, skipped-pending, or
@@ -407,14 +404,14 @@ EOF
     printf 'quiet'
     return 0
   fi
-  now=$(date +%s)
-  if [ "$((now - last))" -lt "$grace" ]; then
-    printf 'quiet'
-    return 0
-  fi
   max=$(fm_task_inbox_ring_max)
   if [ "$count" -ge "$max" ]; then
     printf 'escalate %s %s %s' "$oldest" "$count" "$outcome"
+    return 0
+  fi
+  now=$(date +%s)
+  if [ "$((now - last))" -lt "$grace" ]; then
+    printf 'quiet'
     return 0
   fi
   printf 'ring %s' "$oldest"

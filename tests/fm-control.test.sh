@@ -526,7 +526,7 @@ test_record_bound_to_another_task_is_refused() {
 # refuses, and none of them reaches a local endpoint.
 test_remote_secondmate_is_refused_by_placement() {
   local dir out rc verb
-  for verb in interrupt exit relaunch; do
+  for verb in interrupt unblock exit relaunch; do
     dir=$(new_case "remote-$verb")
     add_task "$dir" t1 claude secondmate
     alive_as "$dir" claude
@@ -694,11 +694,12 @@ test_unblock_submits_pending_text_and_rings() {
 
 # The submit starts the worker's turn, so the re-ring types its doorbell line
 # into a pane that is now busy. A harness that takes the text but swallows the
-# Enter leaves that line unsubmitted - the skipped-doorbell condition again -
-# and the ring's own verdict is not proof of delivery. The outcome must be read
-# off the composer and reported as skipped, and recorded as skipped-pending so
-# the next watcher escalation names the cannot-receive-messages condition
-# rather than a generic idle-pane wedge.
+# Enter leaves that line unsubmitted - the skipped-doorbell condition again.
+# The ring's own submit verdict reads pending here, because the pane is idle
+# and the Enter was genuinely swallowed, so the outcome must be reported as
+# skipped and recorded as skipped-pending, letting the next watcher escalation
+# name the cannot-receive-messages condition rather than a generic idle-pane
+# wedge.
 test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped() {
   local dir out rc
   dir=$(new_case unblock-rering-swallowed)
