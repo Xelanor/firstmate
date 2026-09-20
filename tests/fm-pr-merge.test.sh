@@ -62,18 +62,18 @@ make_case() {
 # post-merge fallback view. Merge itself is `gh pr merge --match-head-commit`.
 # Args: case_dir head_sha
 write_github_live_json() {
-  local case_dir=$1 head=$2
+  local case_dir=$1 head=$2 head_branch=${3:-fm/task-x1}
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","headRefName":"$head_branch","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}
 JSON
 }
 
 write_github_red_json() {
-  local case_dir=$1 head=$2 name=$3
+  local case_dir=$1 head=$2 name=$3 head_branch=${4:-fm/task-x1}
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"$name","status":"COMPLETED","conclusion":"FAILURE"}]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","headRefName":"$head_branch","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"$name","status":"COMPLETED","conclusion":"FAILURE"}]}
 JSON
 }
 
@@ -108,7 +108,7 @@ write_github_rollup_json() {
   done
   printf '%s\n' "$head" > "$case_dir/github-head"
   cat > "$case_dir/github-view.json" <<JSON
-{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","baseRefName":"main","statusCheckRollup":[$rollup]}
+{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"$head","headRefName":"fm/task-x1","baseRefName":"main","statusCheckRollup":[$rollup]}
 JSON
 }
 
@@ -123,8 +123,8 @@ assert_logged_gh_merge() {
 }
 
 add_gh_mocks() {
-  local case_dir=$1 head=$2
-  write_github_live_json "$case_dir" "$head"
+  local case_dir=$1 head=$2 head_branch=${3:-fm/task-x1}
+  write_github_live_json "$case_dir" "$head" "$head_branch"
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_TEST_GH_AXI_LOG"
@@ -297,7 +297,7 @@ write_mr_json() {
   local file=$1 kv key value
   local state=opened detail=mergeable conflicts=false discussions=true
   local head=$MR_HEAD pipeline_sha=$MR_HEAD pipeline_status=success pipeline=present
-  local merge_when_pipeline_succeeds=false merge_after=null
+  local merge_when_pipeline_succeeds=false merge_after=null source_branch=fm/task-x1
   shift
   for kv in "$@"; do
     key=${kv%%=*}
@@ -308,6 +308,7 @@ write_mr_json() {
       conflicts) conflicts=$value ;;
       discussions) discussions=$value ;;
       head) head=$value ;;
+      source_branch) source_branch=$value ;;
       pipeline_sha) pipeline_sha=$value ;;
       pipeline_status) pipeline_status=$value ;;
       pipeline) pipeline=$value ;;
@@ -321,8 +322,8 @@ write_mr_json() {
   fi
   printf '{"iid":7,"state":"%s","detailed_merge_status":"%s","has_conflicts":%s,' \
     "$state" "$detail" "$conflicts" > "$file"
-  printf '"blocking_discussions_resolved":%s,"sha":"%s","head_pipeline":%s,' \
-    "$discussions" "$head" "$pipeline" >> "$file"
+  printf '"blocking_discussions_resolved":%s,"sha":"%s","source_branch":"%s","head_pipeline":%s,' \
+    "$discussions" "$head" "$source_branch" "$pipeline" >> "$file"
   printf '"merge_when_pipeline_succeeds":%s,"merge_after":%s}\n' \
     "$merge_when_pipeline_succeeds" "$merge_after" >> "$file"
 }
@@ -1420,9 +1421,11 @@ test_torn_down_task_still_refuses_captain_hold() {
   pass "fm-pr-merge still refuses a captain-held task's merge without a task record"
 }
 
-# The away-posture authority read already tolerates a missing task record (no
-# yolo= to read defaults to none), so the same grant-or-refuse behavior a live
-# task gets must survive for a torn-down one too.
+# A torn-down task still needs away authority, and the refusal has to name the
+# fact that actually went missing. A task's yolo posture is written only into
+# its own record, so once that record is gone there is no yolo authority left to
+# read - saying only "held for the captain return" would send the operator back
+# to recreating the record, which is the habit this whole path exists to end.
 test_torn_down_task_still_requires_away_authority() {
   local case_dir rc url head
   head=7474747474747474747474747474747474747474
@@ -1437,8 +1440,12 @@ test_torn_down_task_still_requires_away_authority() {
   rc=$?
   set -e
   expect_code 1 "$rc" "torn-down-away-held: an ungranted away merge must still refuse without a task record"
-  assert_grep 'task task-x1 is held for the captain return' "$case_dir/stderr" \
-    "torn-down-away-held: refusal did not name hold-for-return"
+  assert_grep "task task-x1's yolo posture cannot be read because its task record no longer exists" \
+    "$case_dir/stderr" \
+    "torn-down-away-held: refusal did not name the unreadable yolo posture"
+  assert_grep 'grant task-x1 in the away-posture record rather than recreating that record' \
+    "$case_dir/stderr" \
+    "torn-down-away-held: refusal did not point at the grant instead of the record"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "torn-down-away-held: gh pr merge ran without a grant"
 
@@ -1450,6 +1457,80 @@ test_torn_down_task_still_requires_away_authority() {
     || fail "torn-down-away-grant: a granted green merge should succeed without a task record"
   assert_logged_gh_merge "$case_dir" 74 example/repo --squash
   pass "fm-pr-merge honors the same away-posture authority for a torn-down task"
+}
+
+# A live task with a yolo=on record is untouched by that refusal wording: its
+# posture is readable, so it merges while away exactly as before.
+test_live_yolo_task_still_merges_while_away() {
+  local case_dir url
+  url=https://github.com/example/repo/pull/75
+  case_dir=$(make_case live-yolo-away)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" 7575757575757575757575757575757575757575
+  printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
+  write_away_record "$case_dir"
+
+  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "live-yolo-away: a live yolo task's green merge should still succeed while away"
+  assert_logged_gh_merge "$case_dir" 75 example/repo --squash
+  assert_no_grep 'yolo posture cannot be read' "$case_dir/stderr" \
+    "live-yolo-away: a readable yolo posture must not report itself as missing"
+  pass "fm-pr-merge still merges a live yolo task while away"
+}
+
+# Losing the task record loses the recorded pr= that binds a task to its pull
+# request, so an away grant for a torn-down task must not become a licence to
+# merge any green pull request. The task's canonical branch fm/<task-id> is that
+# binding instead, read live from the forge before the merge command runs.
+test_torn_down_away_merge_binds_to_the_task_branch() {
+  local case_dir rc url head
+  head=7676767676767676767676767676767676767676
+  url=https://github.com/example/repo/pull/76
+
+  case_dir=$(make_torn_down_case torn-down-foreign-branch)
+  add_gh_mocks "$case_dir" "$head" fm/task-other
+  write_away_record "$case_dir" --grant task-x1
+  set +e
+  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "torn-down-foreign-branch: a grant must not merge another task's pull request"
+  assert_grep 'the live head branch is "fm/task-other"' "$case_dir/stderr" \
+    "torn-down-foreign-branch: refusal did not name the branch mismatch"
+  assert_grep 'covers only its own branch fm/task-x1' "$case_dir/stderr" \
+    "torn-down-foreign-branch: refusal did not name the task's own branch"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "torn-down-foreign-branch: gh pr merge ran for a foreign branch"
+
+  case_dir=$(make_torn_down_case torn-down-own-branch)
+  add_gh_mocks "$case_dir" "$head" fm/task-x1
+  write_away_record "$case_dir" --grant task-x1
+  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "torn-down-own-branch: the same grant should merge the task's own branch"
+  assert_logged_gh_merge "$case_dir" 76 example/repo --squash
+  pass "an away grant for a torn-down task merges only that task's own branch"
+}
+
+# The branch binding is away-only: an attended merge (no away-posture record)
+# still merges a torn-down task's pull request whatever its head branch is
+# named, because nothing there is running on a grant that could be exploited.
+test_torn_down_attended_merge_ignores_the_branch_name() {
+  local case_dir url
+  url=https://github.com/example/repo/pull/77
+  case_dir=$(make_torn_down_case torn-down-attended-branch)
+  add_gh_mocks "$case_dir" 7777777777777777777777777777777777777777 feature/renamed
+  : > "$case_dir/gh-axi.log"
+
+  run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "torn-down-attended-branch: an attended merge should not be branch-bound"
+  assert_logged_gh_merge "$case_dir" 77 example/repo --squash
+  assert_no_grep 'live head branch' "$case_dir/stderr" \
+    "torn-down-attended-branch: an attended merge reported a branch refusal"
+  pass "fm-pr-merge does not branch-bind an attended torn-down merge"
 }
 
 test_malformed_url_refuses_before_merge() {
@@ -2312,6 +2393,9 @@ test_torn_down_task_merges_when_otherwise_provable
 test_torn_down_task_still_refuses_red_checks
 test_torn_down_task_still_refuses_captain_hold
 test_torn_down_task_still_requires_away_authority
+test_live_yolo_task_still_merges_while_away
+test_torn_down_away_merge_binds_to_the_task_branch
+test_torn_down_attended_merge_ignores_the_branch_name
 test_malformed_url_refuses_before_merge
 test_rejects_unsafe_url_segments_before_recording
 test_repo_override_args_refuse_before_recording

@@ -875,7 +875,7 @@ test_away_record_relocates_main_owned_actions_to_the_branch() {
   status=$?
   [ "$status" -ne 6 ] || fail "branch fm-pr-merge still hit the partition under the record: $out"
   assert_contains "$out" "main is parked" "the relocation did not announce itself"
-  assert_contains "$out" "task task-x is held for the captain return" "the merge did not reach its own gate under the record"
+  assert_contains "$out" "task task-x's yolo posture cannot be read because its task record no longer exists" "the merge did not reach its own gate under the record"
 
   # Local-only landing is never relocated: it has no record-side gate.
   out=$(FM_HOME="$home" FM_SUPERVISION_ACTOR=branch "$ROOT/bin/fm-merge-local.sh" task-x 2>&1)
