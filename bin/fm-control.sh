@@ -488,18 +488,29 @@ do_interrupt() {
 # oldest unhandled record, so the recovery completes in one action - the steer
 # that was skipped can land now instead of waiting out the watcher's re-ring
 # grace. The ring keeps its own advisory composer guard (a still-pending
-# composer is skipped, never typed over), records the ladder attempt with the
-# outcome it had, and resets the once-per-message escalation marker so a worker
-# that still never acknowledges can surface again. Prints rang|skipped|failed|
-# none; never fatal: the durable record plus the ladder own delivery from here.
+# composer is skipped, never typed over), and its own submit verdict is not
+# proof, so the outcome is OBSERVED here: a composer that reads pending after
+# the ring means the new doorbell line is sitting unsubmitted, which is the
+# cannot-receive-messages condition again, not a landed ring. It records the
+# ladder attempt with that observed outcome and resets the once-per-message
+# escalation marker so a worker that still never acknowledges can surface
+# again. Prints rang|skipped|failed|none; never fatal: the durable record plus
+# the ladder own delivery from here.
 ring_unhandled_record() {
-  local rec ring_rc outcome ladder_outcome
+  local rec ring_rc outcome ladder_outcome after
   rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
   [ -n "$rec" ] || { printf 'none'; return 0; }
   ring_rc=0
   fm_task_inbox_ring "$BACKEND" "$T" "$rec" "$LABEL" || ring_rc=$?
   case "$ring_rc" in
-    0) outcome=rang; ladder_outcome=rang ;;
+    0)
+      after=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || after=unknown
+      if [ "$after" = pending ]; then
+        outcome=skipped; ladder_outcome=skipped-pending
+      else
+        outcome=rang; ladder_outcome=rang
+      fi
+      ;;
     1) outcome=skipped; ladder_outcome=skipped-pending ;;
     *) outcome=failed; ladder_outcome= ;;
   esac

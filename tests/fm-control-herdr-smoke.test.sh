@@ -474,6 +474,9 @@ grep -qF 'doorbell skipped' "$USMOKE_ERR" \
 pass "real herdr: a steer to a pending composer records durably and skips its doorbell"
 
 # The recovery: submit the stuck text with a verified Enter and land the doorbell.
+# This loop consumes typed input even while it reports working, so ring=rang is
+# a genuinely observed outcome here - it does NOT cover a harness that swallows
+# the re-ring's Enter mid-turn, which tests/fm-control.test.sh owns.
 OUT=$(env FM_HOME="$HOME_DIR" HERDR_SESSION="$SESSION" FM_SPAWN_NO_GUARD=1 \
   FM_CONTROL_POLL=0.3 "$ROOT/bin/fm-control.sh" usmoke unblock 2>&1) \
   || fail "unblock should recover the pending composer on real herdr: $OUT"

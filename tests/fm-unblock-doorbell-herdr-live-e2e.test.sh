@@ -199,13 +199,23 @@ pass "live arc step 1-2: Claude Code ($VERSION) on $HERDR_VER holds the unsubmit
 OUT=$(env FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$HOME_DIR" \
   FM_CONTROL_POLL=0.5 "$ROOT/bin/fm-control.sh" "$TASK" unblock 2>&1) \
   || fail "unblock failed against Claude Code ($VERSION) on $HERDR_VER: $OUT"
+# The re-ring types into a pane the submit just made busy, so a real harness
+# may land it (rang) or leave it in the composer (skipped); both are observed
+# outcomes. What may never appear is failed or none - the record is unhandled
+# and the keystrokes must reach the pane - and the acknowledgement wait below
+# proves the steer itself landed either way.
 case "$OUT" in
-  "unblocked $TASK harness=claude backend=herdr composer=submitted ring="*) : ;;
-  *) fail "unblock should report a verified submit, got: $OUT" ;;
+  "unblocked $TASK harness=claude backend=herdr composer=submitted ring=rang"*) : ;;
+  "unblocked $TASK harness=claude backend=herdr composer=submitted ring=skipped"*) : ;;
+  *) fail "unblock should report a verified submit and an observed ring outcome, got: $OUT" ;;
 esac
-st=$(fm_backend_herdr_composer_state "$TARGET")
-[ "$st" = empty ] \
-  || fail "the live composer was not verified clear after the recovery (verdict '$st')"
+case "$OUT" in
+  *"ring=rang"*)
+    st=$(fm_backend_herdr_composer_state "$TARGET")
+    [ "$st" = empty ] \
+      || fail "a ring reported as rang left text in the live composer (verdict '$st')"
+    ;;
+esac
 
 HANDLED1="$HOME_DIR/state/$TASK.inbox/handled/001.msg"
 HANDLED2="$HOME_DIR/state/$TASK.inbox/handled/002.msg"

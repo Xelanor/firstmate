@@ -105,6 +105,13 @@ case "${1:-}" in
       case "$payload" in
         *'encode launch-brief'*) cat "$D/becomes" > "$D/command" ;;
       esac
+      # Busy-swallow transition: when $D/pane-on-literal exists, typed text
+      # lands in the composer and the harness stops consuming Enter, which is
+      # how a re-ring into a pane that turned busy mid-turn is driven.
+      if [ -f "$D/pane-on-literal" ]; then
+        cp "$D/pane-on-literal" "$D/pane"
+        rm -f "$D/pane-on-enter"
+      fi
     else
       printf '%s\n' "$payload" >> "$D/keys"
       # Enter transition: when $D/pane-on-enter exists, delivering Enter
@@ -685,6 +692,31 @@ test_unblock_submits_pending_text_and_rings() {
   pass "fm-control unblock: submits pending composer text, verifies it clear, and re-rings the doorbell"
 }
 
+# The submit starts the worker's turn, so the re-ring types its doorbell line
+# into a pane that is now busy. A harness that takes the text but swallows the
+# Enter leaves that line unsubmitted - the skipped-doorbell condition again -
+# and the ring's own verdict is not proof of delivery. The outcome must be read
+# off the composer and reported as skipped, and recorded as skipped-pending so
+# the next watcher escalation names the cannot-receive-messages condition
+# rather than a generic idle-pane wedge.
+test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped() {
+  local dir out rc
+  dir=$(new_case unblock-rering-swallowed)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')" "$(printf '\xe2\x9d\xaf')"
+  printf 'some transcript\n%s\n' "$(printf '\xe2\x9d\xaf : Firstmate instruction waiting')" \
+    > "$dir/fake/pane-on-literal"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "the submit itself was verified, so the verb still succeeds"
+  assert_contains "$out" "composer=submitted ring=skipped" \
+    "a re-ring left unsubmitted in the composer must not be reported as rang"
+  assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "skipped-pending" \
+    "the ladder must record the observed skip so the escalation names the right condition"
+  pass "fm-control unblock: a re-ring swallowed by a busy pane reports skipped, not rang"
+}
+
 test_unblock_already_clear_composer_rings_without_submitting() {
   local dir out rc
   dir=$(new_case unblock-clear)
@@ -1068,6 +1100,7 @@ test_verb_allowlist_is_closed
 test_resume_is_refused_with_its_reason
 test_relaunch_only_flags_are_rejected_on_other_verbs
 test_unblock_submits_pending_text_and_rings
+test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped
 test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
 test_unblock_fails_loudly_when_enter_is_swallowed
