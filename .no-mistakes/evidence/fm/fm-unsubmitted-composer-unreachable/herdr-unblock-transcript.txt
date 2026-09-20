@@ -1,0 +1,32 @@
+$ bin/fm-send.sh usmoke "a steer the worker cannot receive"   (real Herdr, composer holds unsubmitted text)
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the requested message WILL still be sent.
+  ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /tmp/fm-control-herdr.H0xKXO/home/state/usmoke.inbox/001.msg and the watcher will re-ring
+  composer state now: pending
+  durable record kept: yes
+  worker saw nothing submitted: yes
+
+$ bin/fm-control.sh usmoke unblock
+  unblocked usmoke harness=claude backend=herdr composer=submitted ring=rang endpoint=fm-lab-control-smoke-17260:w1:p3
+  composer state after recovery: empty
+  lines the worker actually received after the recovery:
+    6120737465657220747970656420627574206e65766572207375626d6974746564	a steer typed but never submitted	user
+    3a2046697273746d61746520696e737472756374696f6e2077616974696e673a206c69737420272f746d702f666d2d636f6e74726f6c2d68657264722e4830784b584f2f686f6d652f73746174652f75736d6f6b652e696e626f78272f2a2e6d736720616e642c20696e206e756d65726963206f726465722c207265616420616e6420616374206f6e20656163682c207468656e206d7620656163682068616e646c65642066696c6520746f20272f746d702f666d2d636f6e74726f6c2d68657264722e4830784b584f2f686f6d652f73746174652f75736d6f6b652e696e626f78272f68616e646c65642f2e	: Firstmate instruction waiting: list '/tmp/fm-control-herdr.H0xKXO/home/state/usmoke.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/tmp/fm-control-herdr.H0xKXO/home/state/usmoke.inbox'/handled/.	user
+
+$ bin/fm-control.sh uadv unblock   (real Herdr; the harness SWALLOWS every Enter)
+  exit status: 1
+  error: task uadv's composer still holds its pending text after 2 verified Enter attempts; the text was not submitted and nothing was cleared. Inspect the pane with fm-peek.sh before any further action - a relaunch remains the heavier rung and would discard the conversation
+  composer after the failed recovery: pending (the unlanded work is untouched)
+  anything submitted: no
+  endpoint still present: yes (no relaunch, no teardown)
+
+$ bin/fm-control.sh unoag unblock   (real Herdr; the pane hosts no agent)
+  backend classifies the endpoint as: dead
+  exit status: 1
+  error: no agent is running at task unoag's recorded endpoint (state: dead); the unblocked doorbell would land in a dead pane - recover the worker instead
+  pane screen changed by the refusal: no

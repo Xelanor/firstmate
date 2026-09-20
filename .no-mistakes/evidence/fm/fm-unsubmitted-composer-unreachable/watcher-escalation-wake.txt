@@ -1,0 +1,11 @@
+=== condition: skipped ===
+--- supervisor wake queued by bin/fm-watch.sh ---
+1789948061	1	stale	sess:fm-t1	stale: sess:fm-t1 (unread firstmate instruction: /tmp/fm-task-inbox.xXIGcp/ev-skipped/state/t1.inbox/001.msg is unhandled and the worker cannot receive messages: its input line holds unsubmitted text, so every doorbell delivery attempt was skipped. It is not an idle-pane wedge. Restore steerability in place with bin/fm-control.sh t1 unblock, which submits the stuck text and re-rings without stopping the agent)
+--- ladder .ring-state (msg / attempts / epoch / last-outcome) ---
+001.msg	1	1789948060	skipped-pending
+
+=== condition: idle ===
+--- supervisor wake queued by bin/fm-watch.sh ---
+1789948065	1	stale	sess:fm-t1	stale: sess:fm-t1 (unread firstmate instruction: /tmp/fm-task-inbox.xXIGcp/ev-idle/state/t1.inbox/001.msg still unhandled after 1 doorbell delivery attempts with an idle pane; inspect the worker)
+--- ladder .ring-state (msg / attempts / epoch / last-outcome) ---
+001.msg	1	1789948063	rang
