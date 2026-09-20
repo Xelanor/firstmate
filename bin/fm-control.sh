@@ -497,12 +497,14 @@ do_interrupt() {
 # (FM_TASK_INBOX_RING_VERDICT): a proven `pending` there means the new doorbell
 # line is sitting unsubmitted - the cannot-receive-messages condition again -
 # while an Enter accepted and queued behind a busy turn reads `empty` and is a
-# landed ring. It records the ladder attempt with that outcome and resets the
-# once-per-message escalation marker so a worker that still never acknowledges
-# can surface again. Prints rang|skipped|failed|none; never fatal: the durable
-# record plus the ladder own delivery from here.
+# landed ring. A PROVEN landed ring restarts the whole ladder, because the
+# unanswered attempts it counted have just been answered by a real delivery;
+# every other outcome keeps that history and only re-arms the escalation, so a
+# worker that is still unreachable can never have its attempt record cleared.
+# Prints rang|skipped|failed|none; never fatal: the durable record plus the
+# ladder own delivery from here.
 ring_unhandled_record() {
-  local rec ring_rc outcome ladder_outcome
+  local rec ring_rc outcome ladder_outcome=
   rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
   [ -n "$rec" ] || { printf 'none'; return 0; }
   ring_rc=0
@@ -511,14 +513,18 @@ ring_unhandled_record() {
     0)
       case "$FM_TASK_INBOX_RING_VERDICT" in
         pending) outcome=skipped; ladder_outcome=skipped-pending ;;
-        *) outcome=rang; ladder_outcome=rang ;;
+        *) outcome=rang ;;
       esac
       ;;
     1) outcome=skipped; ladder_outcome=skipped-pending ;;
-    *) outcome=failed; ladder_outcome= ;;
+    *) outcome=failed ;;
   esac
-  fm_task_inbox_record_ring "$STATE" "$ID" "$rec" "$ladder_outcome" || true
-  fm_task_inbox_reset_escalation "$STATE" "$ID" || true
+  if [ "$outcome" = rang ]; then
+    fm_task_inbox_reset_ladder "$STATE" "$ID" "$rec" || true
+  else
+    fm_task_inbox_record_ring "$STATE" "$ID" "$rec" "$ladder_outcome" || true
+    fm_task_inbox_reset_escalation "$STATE" "$ID" || true
+  fi
   printf '%s' "$outcome"
 }
 

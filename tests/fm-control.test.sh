@@ -664,6 +664,10 @@ write_inbox_record() {  # <case-dir> <id> <text>
   printf 'schema=fm-task-inbox.v1\nat=%s\n--\n%s\n' "$stamp" "$3" > "$home/state/$2.inbox/001.msg"
 }
 
+ladder_count() {  # <case-dir> <id>
+  awk -F '\t' '{print $2}' "$1/home/state/$2.inbox/.ring-state" 2>/dev/null
+}
+
 enter_count() {  # <case-dir>
   grep -c '^Enter$' "$1/fake/keys" || true
 }
@@ -687,8 +691,11 @@ test_unblock_submits_pending_text_and_rings() {
     && fail "the composer was not verified clear after the submit"
   [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
     || fail "the recovery should reset the escalation marker so a still-unacknowledged record can resurface"
-  assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "rang" \
-    "the recovery's ring should be recorded on the ladder with its outcome"
+  # The re-ring landed, so the unanswered-attempt count no longer describes
+  # reality: the ladder restarts and the record gets its ordinary grace to be
+  # acknowledged instead of re-alarming as a wedge on the next watcher poll.
+  [ "$(ladder_count "$dir" t1)" = 0 ] \
+    || fail "a proven-landed recovery should restart the ladder, got count '$(ladder_count "$dir" t1)'"
   pass "fm-control unblock: submits pending composer text, verifies it clear, and re-rings the doorbell"
 }
 
@@ -715,6 +722,12 @@ test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped() {
     "a re-ring left unsubmitted in the composer must not be reported as rang"
   assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "skipped-pending" \
     "the ladder must record the observed skip so the escalation names the right condition"
+  # Nothing was delivered, so the attempt history must survive: a worker that is
+  # still unreachable may never have its ladder cleared.
+  [ "$(ladder_count "$dir" t1)" != 0 ] \
+    || fail "a skipped re-ring must keep the ladder's attempt history, not restart it"
+  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
+    || fail "a skipped re-ring must still re-arm surfacing so the condition returns"
   pass "fm-control unblock: a re-ring swallowed by a busy pane reports skipped, not rang"
 }
 
@@ -738,8 +751,8 @@ test_unblock_rering_queued_behind_a_busy_turn_reports_rang() {
   expect_code 0 "$rc" "a queued re-ring behind a busy turn is still a success"
   assert_contains "$out" "composer=submitted ring=rang" \
     "an Enter accepted and queued behind a busy turn is a landed re-ring"
-  assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "rang" \
-    "the ladder must not claim the cannot-receive-messages condition for a delivered ring"
+  [ "$(ladder_count "$dir" t1)" = 0 ] \
+    || fail "a delivered ring must restart the ladder, not leave the unanswered attempts standing"
   pass "fm-control unblock: a re-ring queued behind a busy turn reports rang, not skipped"
 }
 

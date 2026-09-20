@@ -521,6 +521,21 @@ test_ring_ladder_policy() {
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "escalate $rec 4 rang" ] \
     || fail "a spent budget should escalate without waiting out the ring spacing, got: $action"
+  # A PROVEN re-delivery restarts the ladder: the attempts it counted have just
+  # been answered, so the record goes quiet for its ordinary grace period
+  # instead of re-alarming as a wedge on the very next poll, and only then
+  # rings again. The escalation marker goes with it.
+  inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
+  inbox_lib "$state" fm_task_inbox_reset_ladder "$state" t1 "$rec"
+  [ ! -e "$state/t1.inbox/.escalated" ] \
+    || fail "restarting the ladder should clear the escalation marker with it"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] \
+    || fail "a just-re-delivered record should get its grace before anything fires, got: $action"
+  printf '001.msg\t0\t%d\t\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "ring $rec" ] \
+    || fail "once that grace elapses the restarted ladder should ring again, got: $action"
   inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
   # The acknowledgement resets the ladder: the next message starts fresh.
   mv "$rec" "$state/t1.inbox/handled/"

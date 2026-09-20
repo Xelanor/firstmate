@@ -460,15 +460,35 @@ fm_task_inbox_record_escalated() {  # <state-dir> <task-id> <record-path>
   fi
 }
 
-# Clear the escalation marker so a recovered delivery attempt gets a fresh
-# ladder: after the control plane's unblock verb re-rings a record that already
-# surfaced, a worker that still never acknowledges must be able to surface
-# again instead of staying silent behind its old marker. The ladder count is
-# left alone; only the once-per-message suppression is reset. A concurrently
-# removed inbox is a successful no-op.
+# Clear the escalation marker so a record that already surfaced can surface
+# again: after a delivery attempt that did NOT land, a worker that still never
+# acknowledges must not go permanently quiet behind its old marker. The ladder
+# count and last-attempt time are left alone, because the attempt history still
+# describes reality - nothing was delivered. A concurrently removed inbox is a
+# successful no-op.
 fm_task_inbox_reset_escalation() {  # <state-dir> <task-id>
   local dir
   dir=$(fm_task_inbox_dir "$1" "$2")
   [ -d "$dir" ] || return 0
+  rm -f "$dir/.escalated" 2>/dev/null || return 1
+}
+
+# Restart the whole ladder for a record that was PROVENLY re-delivered: the
+# count of unanswered delivery attempts no longer describes reality, so it goes
+# back to zero with the attempt time set to now, and the escalation marker is
+# cleared with it. The record therefore gets its ordinary grace period to be
+# acknowledged before anything rings or surfaces again, and if the worker still
+# never handles it the ladder rings and escalates on its own schedule - the
+# alarm is delayed, never disabled. Only a caller that proved the delivery may
+# use this; a skipped or failed attempt must keep its history and clear only
+# the marker. A concurrently removed inbox is a successful no-op.
+fm_task_inbox_reset_ladder() {  # <state-dir> <task-id> <record-path>
+  local dir
+  dir=$(fm_task_inbox_dir "$1" "$2")
+  [ -d "$dir" ] || return 0
+  if ! { printf '%s\t0\t%s\t\n' "${3##*/}" "$(date +%s)" > "$dir/.ring-state"; } 2>/dev/null; then
+    [ -d "$dir" ] || return 0
+    return 1
+  fi
   rm -f "$dir/.escalated" 2>/dev/null || return 1
 }
