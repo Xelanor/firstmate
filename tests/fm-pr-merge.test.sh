@@ -1369,6 +1369,8 @@ test_torn_down_task_merges_when_otherwise_provable() {
     "torn-down-merges: a torn-down task must not arm a merge poll for itself"
   assert_grep 'notice: task task-x1 has no task record' "$case_dir/stderr" \
     "torn-down-merges: the run did not explain it was merging without a task record"
+  assert_no_grep 'No such file or directory' "$case_dir/stderr" \
+    "torn-down-merges: a read was still pointed at the absent task record"
   pass "fm-pr-merge merges a torn-down task's pull request from the forge's own live state"
 }
 
@@ -1499,8 +1501,14 @@ test_torn_down_away_merge_binds_to_the_task_branch() {
   expect_code 1 "$rc" "torn-down-foreign-branch: a grant must not merge another task's pull request"
   assert_grep 'the live head branch is "fm/task-other"' "$case_dir/stderr" \
     "torn-down-foreign-branch: refusal did not name the branch mismatch"
-  assert_grep 'covers only its own branch fm/task-x1' "$case_dir/stderr" \
-    "torn-down-foreign-branch: refusal did not name the task's own branch"
+  assert_grep 'nothing recorded binds this pull request to it' "$case_dir/stderr" \
+    "torn-down-foreign-branch: refusal did not name the missing binding"
+  assert_grep 'merge it attended instead, with an operator present' "$case_dir/stderr" \
+    "torn-down-foreign-branch: refusal did not name the attended way through"
+  assert_grep 'do not recreate the task record' "$case_dir/stderr" \
+    "torn-down-foreign-branch: refusal did not warn against recreating the record"
+  assert_no_grep 'held for the captain return' "$case_dir/stderr" \
+    "torn-down-foreign-branch: the branch refusal read as a generic not-granted"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "torn-down-foreign-branch: gh pr merge ran for a foreign branch"
 
@@ -1512,6 +1520,24 @@ test_torn_down_away_merge_binds_to_the_task_branch() {
     || fail "torn-down-own-branch: the same grant should merge the task's own branch"
   assert_logged_gh_merge "$case_dir" 76 example/repo --squash
   pass "an away grant for a torn-down task merges only that task's own branch"
+}
+
+# The GitLab path reads a recorded pr_head= too, and that read must not be
+# pointed at an absent record either: a torn-down GitLab merge succeeds from the
+# live merge request alone, with nothing about a missing file on stderr.
+test_torn_down_gitlab_merge_reads_only_live_state() {
+  local case_dir
+  case_dir=$(make_gitlab_case torn-down-gitlab)
+  rm -f "$case_dir/state/task-x1.meta"
+
+  run_pr_merge "$case_dir" task-x1 "$MR_URL" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "torn-down-gitlab: a torn-down task's mergeable merge request should merge"
+  [ -n "$(glab_merge_line "$case_dir/glab.log")" ] \
+    || fail "torn-down-gitlab: no glab merge was attempted"
+  assert_no_grep 'No such file or directory' "$case_dir/stderr" \
+    "torn-down-gitlab: a read was still pointed at the absent task record"
+  pass "fm-pr-merge merges a torn-down task's merge request from live GitLab state alone"
 }
 
 # The branch binding is away-only: an attended merge (no away-posture record)
@@ -2396,6 +2422,7 @@ test_torn_down_task_still_requires_away_authority
 test_live_yolo_task_still_merges_while_away
 test_torn_down_away_merge_binds_to_the_task_branch
 test_torn_down_attended_merge_ignores_the_branch_name
+test_torn_down_gitlab_merge_reads_only_live_state
 test_malformed_url_refuses_before_merge
 test_rejects_unsafe_url_segments_before_recording
 test_repo_override_args_refuse_before_recording

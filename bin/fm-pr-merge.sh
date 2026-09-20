@@ -26,6 +26,10 @@
 # bin/fm-merge-local.sh already owns without the record. That refusal is
 # accumulated with the other pre-merge conditions, before the forge command runs,
 # and never applies to an attended merge or to a task whose record is present.
+# Because fm/<task-id> is a convention rather than an enforced fact, a torn-down
+# task whose pull request was pushed from another branch is refused here by
+# design; the refusal names the way through, which is an attended merge by a
+# present operator, never a recreated task record.
 # The yolo posture has no such stand-in: bin/fm-spawn.sh writes yolo= only into
 # the task record, so a torn-down task simply has no readable yolo authority and
 # its ungranted away merge is refused naming that missing fact, with no bypass.
@@ -432,7 +436,7 @@ fi
 # The recorded head is read before bin/fm-pr-check.sh rewrites the metadata,
 # because that script re-records pr= and drops a pr_head= it cannot resolve.
 RECORDED_HEAD=
-if [ "$PROVIDER" = gitlab ]; then
+if [ "$PROVIDER" = gitlab ] && [ "$TASK_RECORD_PRESENT" = true ]; then
   RECORDED_HEAD=$(grep '^pr_head=' "$META" | tail -1 | cut -d= -f2- || true)
 fi
 
@@ -441,11 +445,18 @@ fi
 # recorded identity, which would otherwise let an away authority - a named merge
 # grant or a standing yolo posture - reach the forge for any pull request at all.
 # The task's canonical branch fm/<task-id>, which bin/fm-merge-local.sh already
-# owns without reading the task record, is that binding instead: the live head
+# owns without reading the task record, is the only binding left: the live head
 # branch the forge reports must be exactly that branch. Sets
-# FM_PR_AWAY_BRANCH_REFUSAL to the refusal line for the live verify to accumulate,
+# FM_PR_AWAY_BRANCH_REFUSAL to the refusal lines for the live verify to accumulate,
 # empty when the merge is not this case (a record is present, or the away-posture
 # record is absent, so an attended merge is never affected) or the branch matches.
+#
+# fm/<task-id> is a convention, not an enforced fact, so this refuses a torn-down
+# task whose pull request was pushed from some other branch. That residual is
+# accepted rather than papered over: nothing durable survives teardown to bind
+# that pull request to that task id, and while nobody is present to vouch for the
+# pairing there is nothing to merge on. The way through is an attended merge by a
+# present operator, which the refusal names, and never recreating the record.
 FM_PR_AWAY_BRANCH_REFUSAL=
 away_branch_refusal() {  # <live-head-branch>
   local head_branch=${1-}
@@ -453,7 +464,8 @@ away_branch_refusal() {  # <live-head-branch>
   [ "$TASK_RECORD_PRESENT" != true ] || return 0
   [ "$FM_PR_AWAY_POSTURE" = true ] || return 0
   [ "$head_branch" = "fm/$ID" ] && return 0
-  FM_PR_AWAY_BRANCH_REFUSAL="  - task $ID has no task record, so its away merge authority covers only its own branch fm/$ID, but the live head branch is \"${head_branch:-unreadable}\"
+  FM_PR_AWAY_BRANCH_REFUSAL="  - task $ID has no task record, so nothing recorded binds this pull request to it; its canonical branch fm/$ID is the only binding left, and the live head branch is \"${head_branch:-unreadable}\"
+  - an away merge cannot prove this pull request is task $ID's work, so merge it attended instead, with an operator present to vouch for that pairing; do not recreate the task record
 "
 }
 
@@ -1101,6 +1113,7 @@ refuse_github_queue_while_away() {
 
 require_recorded_pr_identity() {
   local existing
+  [ "$TASK_RECORD_PRESENT" = true ] || return 0
   existing=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
   [ -n "$existing" ] || return 0
   [ "$existing" = "$URL" ] && return 0
