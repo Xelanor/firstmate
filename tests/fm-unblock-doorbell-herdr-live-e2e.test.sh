@@ -98,7 +98,18 @@ TARGET="$SESSION:$PANE"
 VERSION=$(PATH="$ORIGINAL_PATH" claude --version 2>/dev/null | head -1 || printf 'version-unknown')
 HERDR_VER=$(PATH="$ORIGINAL_PATH" herdr --version 2>/dev/null | head -1 || printf 'herdr-unknown')
 
-lab pane run "$PANE" "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}'" >/dev/null \
+# Claude Code gates a folder it has never opened behind an interactive
+# workspace-trust dialog whose cursor sits on "No, exit", and this guard must
+# never answer it - a real spawn does not either; bin/fm-claude-trust.sh
+# pre-registers the trust in the store the launched agent reads. A checkout the
+# operator has never opened by hand (every no-mistakes gate worktree, for one)
+# therefore needs that registration in an isolated store, so forward an
+# explicitly set CLAUDE_CONFIG_DIR onto the launch exactly as bin/fm-spawn.sh
+# forwards it. Unset, the launch is byte-for-byte what it always was.
+CLAUDE_ENV=
+[ -n "${CLAUDE_CONFIG_DIR:-}" ] && CLAUDE_ENV="CLAUDE_CONFIG_DIR='$CLAUDE_CONFIG_DIR' "
+
+lab pane run "$PANE" "${CLAUDE_ENV}CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude --dangerously-skip-permissions --settings '{\"feedbackDrafts\":\"off\"}'" >/dev/null \
   || fail "could not launch Claude Code ($VERSION) in the isolated Herdr pane"
 
 idle=0
