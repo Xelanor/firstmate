@@ -35,7 +35,11 @@
 #              skipped steer can land. The agent keeps running: no restart, no
 #              lost conversation, no touched worktree - the lighter rung below
 #              relaunch for exactly the state where relaunch is the wrong
-#              answer. Postcondition: the composer is PROVEN empty afterwards.
+#              answer. Postcondition: the stuck text is PROVEN submitted - the
+#              composer read empty after the Enter. The re-ring that follows
+#              reports its own outcome: `ring=skipped` means the re-rung
+#              doorbell is itself sitting unsubmitted and the ladder recorded
+#              skipped-pending, so the composer is NOT clear at return.
 #              The verb refuses without typing anything on any verdict but a
 #              structurally proven `pending` - including `pending-unproven`,
 #              which the ring never skips on - and fails loudly when the
@@ -488,28 +492,27 @@ do_interrupt() {
 # oldest unhandled record, so the recovery completes in one action - the steer
 # that was skipped can land now instead of waiting out the watcher's re-ring
 # grace. The ring keeps its own advisory composer guard (a still-pending
-# composer is skipped, never typed over), and its own submit verdict is not
-# proof, so the outcome is OBSERVED here: a composer that reads pending after
-# the ring means the new doorbell line is sitting unsubmitted, which is the
-# cannot-receive-messages condition again, not a landed ring. It records the
-# ladder attempt with that observed outcome and resets the once-per-message
-# escalation marker so a worker that still never acknowledges can surface
-# again. Prints rang|skipped|failed|none; never fatal: the durable record plus
-# the ladder own delivery from here.
+# composer is skipped, never typed over), and the outcome is taken from the
+# verdict the ring itself computed through the shared queued-Enter policy
+# (FM_TASK_INBOX_RING_VERDICT): a proven `pending` there means the new doorbell
+# line is sitting unsubmitted - the cannot-receive-messages condition again -
+# while an Enter accepted and queued behind a busy turn reads `empty` and is a
+# landed ring. It records the ladder attempt with that outcome and resets the
+# once-per-message escalation marker so a worker that still never acknowledges
+# can surface again. Prints rang|skipped|failed|none; never fatal: the durable
+# record plus the ladder own delivery from here.
 ring_unhandled_record() {
-  local rec ring_rc outcome ladder_outcome after
+  local rec ring_rc outcome ladder_outcome
   rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
   [ -n "$rec" ] || { printf 'none'; return 0; }
   ring_rc=0
   fm_task_inbox_ring "$BACKEND" "$T" "$rec" "$LABEL" || ring_rc=$?
   case "$ring_rc" in
     0)
-      after=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || after=unknown
-      if [ "$after" = pending ]; then
-        outcome=skipped; ladder_outcome=skipped-pending
-      else
-        outcome=rang; ladder_outcome=rang
-      fi
+      case "$FM_TASK_INBOX_RING_VERDICT" in
+        pending) outcome=skipped; ladder_outcome=skipped-pending ;;
+        *) outcome=rang; ladder_outcome=rang ;;
+      esac
       ;;
     1) outcome=skipped; ladder_outcome=skipped-pending ;;
     *) outcome=failed; ladder_outcome= ;;

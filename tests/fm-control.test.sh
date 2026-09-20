@@ -717,6 +717,31 @@ test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped() {
   pass "fm-control unblock: a re-ring swallowed by a busy pane reports skipped, not rang"
 }
 
+# The mirror case, and the one the shared queued-Enter policy exists for: a
+# harness that accepts the re-ring's Enter mid-turn but keeps the typed text
+# visible (opencode's queued Enter). The ring's own submit verdict resolves
+# that through the policy and reports empty, so the re-ring DID land and must
+# be reported as rang - re-reading the raw composer here would call a delivered
+# doorbell skipped and put the cannot-receive-messages condition on the ladder
+# for a worker that can receive messages.
+test_unblock_rering_queued_behind_a_busy_turn_reports_rang() {
+  local dir out rc
+  dir=$(new_case unblock-rering-queued)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')" "$(printf '\xe2\x9d\xaf')"
+  printf 'some transcript\n%s\nesc to interrupt\n' "$(printf '\xe2\x9d\xaf : Firstmate instruction waiting')" \
+    > "$dir/fake/pane-on-literal"
+  write_inbox_record "$dir" t1 "please continue"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "a queued re-ring behind a busy turn is still a success"
+  assert_contains "$out" "composer=submitted ring=rang" \
+    "an Enter accepted and queued behind a busy turn is a landed re-ring"
+  assert_contains "$(cat "$dir/home/state/t1.inbox/.ring-state")" "rang" \
+    "the ladder must not claim the cannot-receive-messages condition for a delivered ring"
+  pass "fm-control unblock: a re-ring queued behind a busy turn reports rang, not skipped"
+}
+
 test_unblock_already_clear_composer_rings_without_submitting() {
   local dir out rc
   dir=$(new_case unblock-clear)
@@ -1101,6 +1126,7 @@ test_resume_is_refused_with_its_reason
 test_relaunch_only_flags_are_rejected_on_other_verbs
 test_unblock_submits_pending_text_and_rings
 test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped
+test_unblock_rering_queued_behind_a_busy_turn_reports_rang
 test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
 test_unblock_fails_loudly_when_enter_is_swallowed

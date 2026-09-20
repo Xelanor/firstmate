@@ -277,7 +277,12 @@ fm_task_inbox_doorbell_line() {  # <record-path>
 
 # Ring the doorbell, best-effort: one endpoint-liveness pre-check, one advisory
 # composer pre-check, then the backend's submit machinery with a minimal retry
-# budget, verdict discarded.
+# budget. The submit verdict is never delivery proof and never changes the
+# return code, but it IS the one reading of the composer taken through the
+# shared queued-Enter policy, so it is surfaced in FM_TASK_INBOX_RING_VERDICT
+# for a caller that must report what the attempt looked like. Re-reading the
+# composer afterwards instead would re-derive that answer at a different
+# instant, outside the policy, and disagree with it.
 # Returns 0 rang, 1 skipped because the composer PROVENLY holds pending text
 # (the watcher re-rings later), 2 the backend send failed, 3 skipped because
 # the endpoint is positively dead or missing (nothing typed; recovery owns the
@@ -289,8 +294,11 @@ fm_task_inbox_doorbell_line() {  # <record-path>
 # CONSTANT line the worker recovers semantically, while skipping on ambiguous
 # verdicts would starve a harness whose idle screen the classifier cannot
 # positively identify (that classifier is advisory here by design).
+FM_TASK_INBOX_RING_VERDICT=
+
 fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   local backend=$1 target=$2 rec=$3 label=${4:-} line cstate verdict
+  FM_TASK_INBOX_RING_VERDICT=
   case "$(fm_backend_agent_state "$backend" "$target" 2>/dev/null || true)" in
     dead|missing) return 3 ;;
   esac
@@ -308,8 +316,9 @@ fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   if ! verdict=$(fm_backend_send_text_submit "$backend" "$target" "$line" 1 0.4 0.3 "$label" 2>/dev/null); then
     return 2
   fi
-  # The verdict is read only to report a failed keystroke; every other value
-  # (empty, pending, unknown, ...) is deliberately ignored, never proof.
+  # The verdict never proves delivery and never changes the return code beyond
+  # a failed keystroke; it is published for a caller that reports the attempt.
+  FM_TASK_INBOX_RING_VERDICT=$verdict
   [ "$verdict" != send-failed ] || return 2
   return 0
 }
@@ -345,8 +354,11 @@ fm_task_inbox_oldest_unhandled() {  # <state-dir> <task-id>
 }
 
 # The re-ring ladder decision for one task. Prints exactly one of:
-#   quiet                     nothing due (healthy, within grace or spacing,
-#                             or already escalated for the current oldest)
+#   quiet                     nothing due (healthy, within grace or spacing -
+#                             which paces the escalation too, so a just-made
+#                             attempt gets its grace period to be acknowledged
+#                             before surfacing as stale - or already escalated
+#                             for the current oldest)
 #   ring <record-path>        one doorbell re-ring is due
 #   escalate <record-path> <count> <outcome>   attempt budget spent; surface as
 #                             stale, where <outcome> (rang, skipped-pending, or
@@ -395,14 +407,14 @@ EOF
     printf 'quiet'
     return 0
   fi
-  max=$(fm_task_inbox_ring_max)
-  if [ "$count" -ge "$max" ]; then
-    printf 'escalate %s %s %s' "$oldest" "$count" "$outcome"
-    return 0
-  fi
   now=$(date +%s)
   if [ "$((now - last))" -lt "$grace" ]; then
     printf 'quiet'
+    return 0
+  fi
+  max=$(fm_task_inbox_ring_max)
+  if [ "$count" -ge "$max" ]; then
+    printf 'escalate %s %s %s' "$oldest" "$count" "$outcome"
     return 0
   fi
   printf 'ring %s' "$oldest"

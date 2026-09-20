@@ -507,12 +507,25 @@ test_ring_ladder_policy() {
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an escalated message should stay quiet for recovery, got: $action"
   # Resetting the escalation marker re-arms surfacing for a recovery attempt,
-  # while the spent attempt budget still escalates immediately rather than
-  # silently re-ringing forever.
+  # while the spent attempt budget still escalates rather than silently
+  # re-ringing forever.
   inbox_lib "$state" fm_task_inbox_reset_escalation "$state" t1
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "escalate $rec 3 unknown" ] \
     || fail "a reset escalation marker should re-arm surfacing, got: $action"
+  # A recovery that just made its delivery attempt gets the same grace period
+  # every other attempt gets before the record surfaces as stale: escalating on
+  # the very next poll would alarm a worker that was just reached and has not
+  # had time to acknowledge.
+  rm -f "$state/t1.inbox/.escalated"
+  inbox_lib "$state" fm_task_inbox_record_ring "$state" t1 "$rec" rang
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] \
+    || fail "a just-made recovery attempt should get its grace before escalating, got: $action"
+  printf '001.msg\t4\t%d\trang\n' "$((now - 3600))" > "$state/t1.inbox/.ring-state"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "escalate $rec 4 rang" ] \
+    || fail "once that grace elapses the spent budget must still escalate, got: $action"
   inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
   # The acknowledgement resets the ladder: the next message starts fresh.
   mv "$rec" "$state/t1.inbox/handled/"
