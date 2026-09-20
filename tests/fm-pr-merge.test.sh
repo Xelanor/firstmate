@@ -1303,11 +1303,15 @@ test_extra_merge_args_forwarded() {
   pass "fm-pr-merge refuses branch deletion unless --attended-override is passed"
 }
 
-test_missing_meta_refuses_before_merge() {
+# A task record that exists but is unsafe (a symlink, never the clean
+# already-torn-down case) still refuses exactly as before.
+test_unsafe_meta_refuses_before_merge() {
   local case_dir fakebin rc
-  case_dir="$TMP_ROOT/missing-meta"
+  case_dir="$TMP_ROOT/unsafe-meta"
   fakebin="$case_dir/fakebin"
   mkdir -p "$case_dir/state" "$fakebin"
+  : > "$case_dir/state/.elsewhere.meta"
+  ln -s "$case_dir/state/.elsewhere.meta" "$case_dir/state/missing-x1.meta"
   add_gh_mocks "$case_dir" 3333333333333333333333333333333333333333
   : > "$case_dir/gh-axi.log"
 
@@ -1317,13 +1321,135 @@ test_missing_meta_refuses_before_merge() {
   rc=$?
   set -e
 
-  expect_code 1 "$rc" "missing-meta: fm-pr-merge should refuse"
+  expect_code 1 "$rc" "unsafe-meta: fm-pr-merge should refuse"
   assert_grep 'error: task metadata is unavailable' "$case_dir/stderr" \
-    "missing-meta: refusal did not explain missing meta"
-  [ ! -s "$case_dir/gh.log" ] || fail "missing-meta: gh pr merge was invoked"
+    "unsafe-meta: refusal did not explain missing meta"
+  [ ! -s "$case_dir/gh.log" ] || fail "unsafe-meta: gh pr merge was invoked"
   assert_absent "$case_dir/state/missing-x1.check.sh" \
-    "missing-meta: fm-pr-check should not arm a poll for an unknown task"
-  pass "fm-pr-merge refuses before merging when task meta is missing"
+    "unsafe-meta: fm-pr-check should not arm a poll for an unknown task"
+  pass "fm-pr-merge refuses before merging when task meta exists but is unsafe"
+}
+
+# A torn-down task's fixture: a full task case, with its own record removed
+# exactly the way fm-teardown.sh removes it once the task's work is already
+# safe on a remote but its pull request is still open. No worktree is created
+# because a torn-down task's own PR-check re-recording step no longer runs.
+make_torn_down_case() {
+  local name=$1 case_dir
+  case_dir=$(make_case "$name")
+  rm -f "$case_dir/state/task-x1.meta"
+  printf '%s' "$case_dir"
+}
+
+# Reproduces the captain's report: cleanup removed a finished task's own
+# record while its pull request was still open, and a secondmate had to
+# recreate the record by hand to get a fully green pull request past this
+# guard. The pull request's own live state, read directly from the forge
+# exactly as for a live task, decides the merge; only the task's own
+# bookkeeping (re-arming its merge poll, persisting merge authority against
+# its own record) is skipped, since there is no task left to own it.
+test_torn_down_task_merges_when_otherwise_provable() {
+  local case_dir rc
+  case_dir=$(make_torn_down_case torn-down-merges)
+  add_gh_mocks "$case_dir" 7171717171717171717171717171717171717171
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/71 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "torn-down-merges: a torn-down task's genuinely mergeable PR should merge"
+  assert_logged_gh_merge "$case_dir" 71 example/repo --squash
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "torn-down-merges: the merge must not recreate the task's own record"
+  assert_absent "$case_dir/state/task-x1.check.sh" \
+    "torn-down-merges: a torn-down task must not arm a merge poll for itself"
+  assert_grep 'notice: task task-x1 has no task record' "$case_dir/stderr" \
+    "torn-down-merges: the run did not explain it was merging without a task record"
+  pass "fm-pr-merge merges a torn-down task's pull request from the forge's own live state"
+}
+
+# The live green-check proof is not weakened for a torn-down task.
+test_torn_down_task_still_refuses_red_checks() {
+  local case_dir rc head
+  head=7272727272727272727272727272727272727272
+  case_dir=$(make_torn_down_case torn-down-red-checks)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/72 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "torn-down-red-checks: a red check must still refuse without a task record"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" \
+    "torn-down-red-checks: refusal did not name the red check"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "torn-down-red-checks: gh pr merge ran despite a red check"
+  pass "fm-pr-merge still refuses a red check for a torn-down task"
+}
+
+# The captain-hold proof is not weakened either: it is already independent of
+# the task record (it reads the backlog directly), and stays that way.
+test_torn_down_task_still_refuses_captain_hold() {
+  local case_dir rc
+  case_dir=$(make_torn_down_case torn-down-captain-hold)
+  add_gh_mocks "$case_dir" 7373737373737373737373737373737373737373
+  : > "$case_dir/gh-axi.log"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-captain-hold.sh" hold task-x1 --title "captain call" \
+    --reason "needs a captain decision" >/dev/null \
+    || fail "torn-down-captain-hold: could not hold task-x1 for the captain"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/73 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "torn-down-captain-hold: a captain-held task must still refuse without a task record"
+  assert_grep 'still held for the captain' "$case_dir/stderr" \
+    "torn-down-captain-hold: refusal did not name the captain hold"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "torn-down-captain-hold: gh pr merge ran while the task was held for the captain"
+  pass "fm-pr-merge still refuses a captain-held task's merge without a task record"
+}
+
+# The away-posture authority read already tolerates a missing task record (no
+# yolo= to read defaults to none), so the same grant-or-refuse behavior a live
+# task gets must survive for a torn-down one too.
+test_torn_down_task_still_requires_away_authority() {
+  local case_dir rc url head
+  head=7474747474747474747474747474747474747474
+  url=https://github.com/example/repo/pull/74
+
+  case_dir=$(make_torn_down_case torn-down-away-held)
+  add_gh_mocks "$case_dir" "$head"
+  write_away_record "$case_dir"
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "torn-down-away-held: an ungranted away merge must still refuse without a task record"
+  assert_grep 'task task-x1 is held for the captain return' "$case_dir/stderr" \
+    "torn-down-away-held: refusal did not name hold-for-return"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "torn-down-away-held: gh pr merge ran without a grant"
+
+  case_dir=$(make_torn_down_case torn-down-away-grant)
+  add_gh_mocks "$case_dir" "$head"
+  write_away_record "$case_dir" --grant task-x1
+  FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "torn-down-away-grant: a granted green merge should succeed without a task record"
+  assert_logged_gh_merge "$case_dir" 74 example/repo --squash
+  pass "fm-pr-merge honors the same away-posture authority for a torn-down task"
 }
 
 test_malformed_url_refuses_before_merge() {
@@ -2181,7 +2307,11 @@ test_github_verified_merge_requires_poll_recording
 test_github_queued_outcome_is_verified
 test_github_queue_required_refusal_names_retry_flags
 test_extra_merge_args_forwarded
-test_missing_meta_refuses_before_merge
+test_unsafe_meta_refuses_before_merge
+test_torn_down_task_merges_when_otherwise_provable
+test_torn_down_task_still_refuses_red_checks
+test_torn_down_task_still_refuses_captain_hold
+test_torn_down_task_still_requires_away_authority
 test_malformed_url_refuses_before_merge
 test_rejects_unsafe_url_segments_before_recording
 test_repo_override_args_refuse_before_recording

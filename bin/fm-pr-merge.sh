@@ -6,6 +6,19 @@
 # request is addressed through glab by the project URL rebuilt from the parsed
 # host and path, so any instance works and no host is hardcoded.
 #
+# A task's own record (state/<task-id>.meta) is used when present but is not
+# required: cleanup can remove it while a pushed PR is still open, and a merge
+# for that task must still be possible without recreating it by hand. When it
+# is absent outright, every genuinely merge-deciding proof still runs exactly
+# as it does for a live task - the pull request's live state, the captain-hold
+# read, and the away-posture authority read all come from the forge, the
+# backlog, and state/.afk-contract rather than from the task record - and only
+# the record-bound bookkeeping this task can no longer own (re-arming its own
+# merge poll, persisting merge authority against its own record) is skipped. A
+# record that EXISTS but is unsafe (a symlink, or not a regular file) still
+# refuses outright, same as always: that is not the clean already-torn-down
+# case.
+#
 # Merge method on GitHub defaults to --squash when the caller passes none of
 # --squash, --merge, --rebase, or --method after the optional -- separator.
 # A GitHub merge is refused unless every pre-merge condition holds, each read
@@ -85,7 +98,8 @@
 # docs/captain-hold-lifecycle.md owns the separate merge-to-cleanup residual.
 # A failed forge command releases the lock after it returns. A successful one
 # retains the lock until the accepted merge authority is persisted against the
-# still-matching task metadata.
+# still-matching task metadata, or, for a torn-down task with no metadata to
+# persist against, until that is confirmed to be nothing to do.
 #
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
@@ -323,15 +337,31 @@ META="$STATE/$ID.meta"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
-if [ ! -f "$META" ] || [ -L "$META" ]; then
-  echo "error: task metadata is unavailable" >&2
-  exit 1
+# A task record is not required: a torn-down task (cleanup already removed
+# state/<id>.meta once its work was safely on a remote, while its pull request
+# was still open) merges the same pull request the same way a live task's
+# record would, from the forge's own live state plus the away-posture and
+# captain-hold reads below, neither of which needs the task record either. Only
+# a record that EXISTS in an unsafe form (a symlink, or a non-regular file)
+# still refuses outright, because that is not the clean "already torn down"
+# case and nothing here can tell what it means.
+TASK_RECORD_PRESENT=false
+if [ -e "$META" ] || [ -L "$META" ]; then
+  if [ -f "$META" ] && [ ! -L "$META" ]; then
+    TASK_RECORD_PRESENT=true
+  else
+    echo "error: task metadata is unavailable" >&2
+    exit 1
+  fi
 fi
-if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
-  exit 1
+MERGE_EXPECTED_SPAWN_GEN=
+if [ "$TASK_RECORD_PRESENT" = true ]; then
+  if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+    echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  fi
+  MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 fi
-MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
@@ -343,12 +373,22 @@ merge_control_cleanup() {
 trap merge_control_cleanup EXIT
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
-if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
-  exit 1
-fi
-if [ "$FM_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
-  echo "error: task $ID changed incarnation while waiting to merge; refusing" >&2
+# The record's presence or absence must be the same now as it was before the
+# wait, exactly as its incarnation must be unchanged for a task that has one:
+# teardown and a spawn both take this same lock, so either one racing this
+# wait is "the task changed while waiting to merge", not a state this run may
+# act on.
+if [ "$TASK_RECORD_PRESENT" = true ]; then
+  if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+    echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  fi
+  if [ "$FM_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
+    echo "error: task $ID changed incarnation while waiting to merge; refusing" >&2
+    exit 1
+  fi
+elif [ -e "$META" ] || [ -L "$META" ]; then
+  echo "error: task $ID changed while waiting to merge; refusing: a task record appeared after merging began without one" >&2
   exit 1
 fi
 
@@ -863,6 +903,14 @@ METHODS
 }
 
 record_pr_metadata() {
+  # A torn-down task has no record to update and no future teardown of its own
+  # left to arm a merge poll for; the live verify and merge below prove the
+  # outcome directly instead.
+  if [ "$TASK_RECORD_PRESENT" != true ]; then
+    printf 'notice: task %s has no task record; verifying and merging %s directly, with no poll armed\n' \
+      "$ID" "$URL" >&2
+    return 0
+  fi
   if ! "$SCRIPT_DIR/fm-pr-check.sh" "$ID" "$URL"; then
     return 1
   fi
@@ -951,6 +999,14 @@ require_current_away_authority() {
 
 persist_accepted_merge_authority() {
   local status=0
+  # A torn-down task has no record for the authority to be bound to and no
+  # supervision loop left reading for it; the merge already landed, so this is
+  # nothing to fail the run over.
+  if [ "$TASK_RECORD_PRESENT" != true ]; then
+    printf 'notice: task %s has no task record; the merge authority for %s is not persisted\n' \
+      "$ID" "$URL" >&2
+    return 0
+  fi
   MERGE_META_LOCK=$(fm_meta_lock_path "$META") || return 1
   fm_lock_acquire_wait "$MERGE_META_LOCK" || return 1
   fm_merge_authority_persist "$STATE" "$ID" "$META" \
