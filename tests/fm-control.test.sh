@@ -792,13 +792,21 @@ test_unblock_already_clear_composer_rings_without_submitting() {
   alive_as "$dir" claude
   write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf')"
   write_inbox_record "$dir" t1 "please continue"
+  printf '001.msg\n' > "$dir/home/state/t1.inbox/.escalated"
   out=$(run_control "$dir" t1 unblock); rc=$?
   expect_code 0 "$rc" "an already-clear composer is idempotent success"
   assert_contains "$out" "composer=already-clear ring=rang" \
     "the outcome should report nothing was submitted and the doorbell rang"
   assert_contains "$(literals "$dir")" "Firstmate instruction waiting" \
     "an already-clear composer should still get its unhandled record rung"
-  pass "fm-control unblock: an already-clear composer only re-rings"
+  # Nothing was ever blocked here, so the attempt history is not the recovery's
+  # to clear: wiping it would push a genuine wedge alarm back by a whole fresh
+  # ladder. Only a composer proven pending and actually unblocked may do that.
+  [ "$(ladder_count "$dir" t1)" != 0 ] \
+    || fail "an already-clear composer must not restart the delivery ladder"
+  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
+    || fail "the re-ring should still re-arm surfacing for an unacknowledged record"
+  pass "fm-control unblock: an already-clear composer re-rings without restarting the ladder"
 }
 
 test_unblock_refuses_when_composer_state_is_unreadable() {

@@ -481,14 +481,17 @@ fm_task_inbox_reset_escalation() {  # <state-dir> <task-id>
 # never handles it the ladder rings and escalates on its own schedule - the
 # alarm is delayed, never disabled. Only a caller that proved the delivery may
 # use this; a skipped or failed attempt must keep its history and clear only
-# the marker. A concurrently removed inbox is a successful no-op.
+# the marker. The marker is cleared BEFORE the count is rewritten, so a ladder
+# that cannot be written degrades to "count kept, escalation re-armed" rather
+# than leaving the record silent behind both. A concurrently removed inbox is a
+# successful no-op.
 fm_task_inbox_reset_ladder() {  # <state-dir> <task-id> <record-path>
   local dir
   dir=$(fm_task_inbox_dir "$1" "$2")
   [ -d "$dir" ] || return 0
+  rm -f "$dir/.escalated" 2>/dev/null || return 1
   if ! { printf '%s\t0\t%s\t\n' "${3##*/}" "$(date +%s)" > "$dir/.ring-state"; } 2>/dev/null; then
     [ -d "$dir" ] || return 0
     return 1
   fi
-  rm -f "$dir/.escalated" 2>/dev/null || return 1
 }

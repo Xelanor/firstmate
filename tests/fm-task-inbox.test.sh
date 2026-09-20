@@ -467,7 +467,7 @@ test_fire_and_forget_records_never_enter_the_ladder() {
 }
 
 test_ring_ladder_policy() {
-  local state rec action ladder now
+  local state rec action ladder now rc
   state="$TMP_ROOT/ladder/state"; mkdir -p "$state"
   rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "do the thing")
   # Within grace: quiet.
@@ -536,6 +536,18 @@ test_ring_ladder_policy() {
   action=$(FM_TASK_INBOX_GRACE_SECS=60 FM_TASK_INBOX_RING_MAX=3 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "ring $rec" ] \
     || fail "once that grace elapses the restarted ladder should ring again, got: $action"
+  # A ladder that cannot be written must degrade to "count kept, escalation
+  # re-armed", never to silence: leaving both the spent count and the marker in
+  # place would keep the unhandled record quiet on every later poll.
+  rm -f "$state/t1.inbox/.ring-state"
+  mkdir "$state/t1.inbox/.ring-state"
+  inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
+  rc=0
+  inbox_lib "$state" fm_task_inbox_reset_ladder "$state" t1 "$rec" || rc=$?
+  [ "$rc" != 0 ] || fail "an unwritable ladder restart should report its failure to the caller"
+  [ ! -e "$state/t1.inbox/.escalated" ] \
+    || fail "a failed ladder restart left the record silent behind its escalation marker"
+  rmdir "$state/t1.inbox/.ring-state"
   inbox_lib "$state" fm_task_inbox_record_escalated "$state" t1 "$rec"
   # The acknowledgement resets the ladder: the next message starts fresh.
   mv "$rec" "$state/t1.inbox/handled/"

@@ -37,11 +37,15 @@
 #              relaunch for exactly the state where relaunch is the wrong
 #              answer. Postcondition: the stuck text is PROVEN submitted - the
 #              composer read empty after the Enter. The re-ring that follows
-#              reports its own outcome, and only `ring=rang` proves it landed:
+#              reports its own outcome, and only `ring=rang` proves it landed
+#              (and, after a real unblock, restarts the delivery ladder):
 #              `ring=skipped` means the re-rung doorbell is itself sitting
-#              unsubmitted and the ladder recorded skipped-pending, while
+#              unsubmitted and the ladder recorded skipped-pending,
 #              `ring=unproven` means the submit could not be read either way,
-#              so in neither case is the composer clear at return.
+#              `ring=failed` means the keystrokes never reached the pane,
+#              `ring=endpoint-gone` means the endpoint died between the submit
+#              and the ring, and `ring=none` means there was no unhandled
+#              record left to re-ring.
 #              The verb refuses without typing anything on any verdict but a
 #              structurally proven `pending` - including `pending-unproven`,
 #              which the ring never skips on - and fails loudly when the
@@ -504,11 +508,17 @@ do_interrupt() {
 # line is sitting unsubmitted), and every other verdict - `unknown`,
 # `pending-unproven`, anything unrecognized - proves nothing either way. Both
 # keep the attempt history and only re-arm the escalation, so a worker that may
-# still be unreachable can never have its attempt record cleared.
-# Prints rang|skipped|unproven|failed|none; never fatal: the durable record plus
-# the ladder own delivery from here.
-ring_unhandled_record() {
-  local rec ring_rc outcome ladder_outcome=
+# still be unreachable can never have its attempt record cleared. The ladder
+# restart additionally needs <mode> = reset-ladder from the caller: only a
+# composer that was PROVEN pending and actually unblocked may clear the attempt
+# history, so the idempotent already-clear path re-rings with keep-ladder and
+# records an ordinary attempt instead. A positively dead or missing endpoint
+# never enters the ladder at all (the library's invariant, which the watcher
+# honours too): nothing was typed, so it only re-arms the escalation.
+# Prints rang|skipped|unproven|failed|endpoint-gone|none; never fatal: the
+# durable record plus the ladder own delivery from here.
+ring_unhandled_record() {  # <reset-ladder|keep-ladder>
+  local mode=$1 rec ring_rc outcome ladder_outcome=
   rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
   [ -n "$rec" ] || { printf 'none'; return 0; }
   ring_rc=0
@@ -516,16 +526,19 @@ ring_unhandled_record() {
   case "$ring_rc" in
     0)
       case "$FM_TASK_INBOX_RING_VERDICT" in
-        empty) outcome=rang ;;
+        empty) outcome=rang; ladder_outcome=rang ;;
         pending) outcome=skipped; ladder_outcome=skipped-pending ;;
         *) outcome=unproven ;;
       esac
       ;;
     1) outcome=skipped; ladder_outcome=skipped-pending ;;
+    3) outcome=endpoint-gone ;;
     *) outcome=failed ;;
   esac
-  if [ "$outcome" = rang ]; then
+  if [ "$outcome" = rang ] && [ "$mode" = reset-ladder ]; then
     fm_task_inbox_reset_ladder "$STATE" "$ID" "$rec" || true
+  elif [ "$outcome" = endpoint-gone ]; then
+    fm_task_inbox_reset_escalation "$STATE" "$ID" || true
   else
     fm_task_inbox_record_ring "$STATE" "$ID" "$rec" "$ladder_outcome" || true
     fm_task_inbox_reset_escalation "$STATE" "$ID" || true
@@ -553,7 +566,7 @@ do_unblock() {
   cstate=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || cstate=unknown
   case "$cstate" in
     empty)
-      printf 'composer=already-clear ring=%s' "$(ring_unhandled_record)"
+      printf 'composer=already-clear ring=%s' "$(ring_unhandled_record keep-ladder)"
       return 0
       ;;
     pending) ;;
@@ -568,7 +581,7 @@ do_unblock() {
     cstate=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) || cstate=unknown
     case "$cstate" in
       empty)
-        printf 'composer=submitted ring=%s' "$(ring_unhandled_record)"
+        printf 'composer=submitted ring=%s' "$(ring_unhandled_record reset-ladder)"
         return 0
         ;;
       pending) ;;
