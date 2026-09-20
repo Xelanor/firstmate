@@ -1,0 +1,31 @@
+fm-pr-merge.sh adversarial drive
+repo: /home/berke/.no-mistakes/worktrees/ecf0c8ed7053/01M302ZMZBG6TBFJ3WG8A5R0DF
+commit: 06bde75
+
+=== A1 torn-down + away grant, forge cannot report a head branch ===
+notice: task task-x1 has no task record; verifying and merging https://github.com/example/repo/pull/2001 directly, with no poll armed
+error: refusing to merge https://github.com/example/repo/pull/2001
+  - task task-x1 has no task record, so nothing recorded binds this pull request to it; its canonical branch fm/task-x1 is the only binding left, and the live head branch is "unreadable"
+  - an away merge cannot prove this pull request is task task-x1's work, so merge it attended instead, with an operator present to vouch for that pairing; do not recreate the task record
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== A2 torn-down + away, grant names a different task ===
+error: PR merge refused - task task-x1's yolo posture cannot be read because its task record no longer exists, and no away merge grant names it; grant task-x1 in the away-posture record rather than recreating that record
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== A3 torn-down merge races a respawn: a task record appears while the merge waits for the control lock ===
+error: task task-x1 changed while waiting to merge; refusing: a task record appeared after merging began without one
+--- exit code: 1
+--- gh pr merge calls: 0
+
+=== A4 torn-down, PR already closed on the forge ===
+notice: task task-x1 has no task record; verifying and merging https://github.com/example/repo/pull/2004 directly, with no poll armed
+error: refusing to merge https://github.com/example/repo/pull/2004
+  - state is "CLOSED", not open
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)

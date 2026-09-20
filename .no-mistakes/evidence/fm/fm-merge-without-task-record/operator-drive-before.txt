@@ -1,0 +1,59 @@
+fatal: not a git repository (or any parent up to mount point /)
+Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).
+fm-pr-merge.sh operator drive
+repo: /tmp/fm-base.mmEjCP
+commit: 
+
+=== S1 torn-down task, green PR, operator present (the reported trap) ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== S2 torn-down task, red check ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== S3 torn-down task, captain away, no grant ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== S4 torn-down task, away grant, PR head branch belongs to another task ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== S5 torn-down task, away grant, PR head branch is fm/task-x1 ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
+--- task record after run: absent (not recreated)
+
+=== S6 live task with its record intact, green PR (unchanged path) ===
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/1941 is open and mergeable, with every required check green at head 1111111111111111111111111111111111111111
+verified: https://github.com/example/repo/pull/1941 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- exit code: 0
+--- gh pr merge calls: 1
+    gh pr merge 1941 --repo example/repo --match-head-commit 1111111111111111111111111111111111111111 --squash
+--- task record after run: present
+--- recorded identity in the task record:
+    pr=https://github.com/example/repo/pull/1941
+    pr_head=1111111111111111111111111111111111111111
+
+=== S7 task record present but unsafe (symlink) ===
+error: task metadata is unavailable
+--- exit code: 1
+--- gh pr merge calls: 0
