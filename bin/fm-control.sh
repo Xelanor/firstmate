@@ -37,9 +37,11 @@
 #              relaunch for exactly the state where relaunch is the wrong
 #              answer. Postcondition: the stuck text is PROVEN submitted - the
 #              composer read empty after the Enter. The re-ring that follows
-#              reports its own outcome: `ring=skipped` means the re-rung
-#              doorbell is itself sitting unsubmitted and the ladder recorded
-#              skipped-pending, so the composer is NOT clear at return.
+#              reports its own outcome, and only `ring=rang` proves it landed:
+#              `ring=skipped` means the re-rung doorbell is itself sitting
+#              unsubmitted and the ladder recorded skipped-pending, while
+#              `ring=unproven` means the submit could not be read either way,
+#              so in neither case is the composer clear at return.
 #              The verb refuses without typing anything on any verdict but a
 #              structurally proven `pending` - including `pending-unproven`,
 #              which the ring never skips on - and fails loudly when the
@@ -494,15 +496,17 @@ do_interrupt() {
 # grace. The ring keeps its own advisory composer guard (a still-pending
 # composer is skipped, never typed over), and the outcome is taken from the
 # verdict the ring itself computed through the shared queued-Enter policy
-# (FM_TASK_INBOX_RING_VERDICT): a proven `pending` there means the new doorbell
-# line is sitting unsubmitted - the cannot-receive-messages condition again -
-# while an Enter accepted and queued behind a busy turn reads `empty` and is a
-# landed ring. A PROVEN landed ring restarts the whole ladder, because the
-# unanswered attempts it counted have just been answered by a real delivery;
-# every other outcome keeps that history and only re-arms the escalation, so a
-# worker that is still unreachable can never have its attempt record cleared.
-# Prints rang|skipped|failed|none; never fatal: the durable record plus the
-# ladder own delivery from here.
+# (FM_TASK_INBOX_RING_VERDICT). Exactly `empty` is delivery - including an
+# Enter accepted and queued behind a busy turn, which that policy reads as
+# empty - and only that restarts the whole ladder, because the unanswered
+# attempts it counted have just been answered by a real delivery. A proven
+# `pending` is the cannot-receive-messages condition again (the new doorbell
+# line is sitting unsubmitted), and every other verdict - `unknown`,
+# `pending-unproven`, anything unrecognized - proves nothing either way. Both
+# keep the attempt history and only re-arm the escalation, so a worker that may
+# still be unreachable can never have its attempt record cleared.
+# Prints rang|skipped|unproven|failed|none; never fatal: the durable record plus
+# the ladder own delivery from here.
 ring_unhandled_record() {
   local rec ring_rc outcome ladder_outcome=
   rec=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID" 2>/dev/null) || rec=
@@ -512,8 +516,9 @@ ring_unhandled_record() {
   case "$ring_rc" in
     0)
       case "$FM_TASK_INBOX_RING_VERDICT" in
+        empty) outcome=rang ;;
         pending) outcome=skipped; ladder_outcome=skipped-pending ;;
-        *) outcome=rang ;;
+        *) outcome=unproven ;;
       esac
       ;;
     1) outcome=skipped; ladder_outcome=skipped-pending ;;

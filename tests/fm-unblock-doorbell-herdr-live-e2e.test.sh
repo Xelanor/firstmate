@@ -200,13 +200,15 @@ OUT=$(env FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$HOME_DIR" \
   FM_CONTROL_POLL=0.5 "$ROOT/bin/fm-control.sh" "$TASK" unblock 2>&1) \
   || fail "unblock failed against Claude Code ($VERSION) on $HERDR_VER: $OUT"
 # The re-ring types into a pane the submit just made busy, so a real harness
-# may land it (rang) or leave it in the composer (skipped); both are observed
-# outcomes. What may never appear is failed or none - the record is unhandled
-# and the keystrokes must reach the pane - and the acknowledgement wait below
-# proves the steer itself landed either way.
+# may land it (rang), leave it in the composer (skipped), or render a screen the
+# classifier cannot read either way (unproven); all three are observed outcomes.
+# What may never appear is failed or none - the record is unhandled and the
+# keystrokes must reach the pane - and the acknowledgement wait below proves the
+# steer itself landed either way.
 case "$OUT" in
   "unblocked $TASK harness=claude backend=herdr composer=submitted ring=rang"*) : ;;
   "unblocked $TASK harness=claude backend=herdr composer=submitted ring=skipped"*) : ;;
+  "unblocked $TASK harness=claude backend=herdr composer=submitted ring=unproven"*) : ;;
   *) fail "unblock should report a verified submit and an observed ring outcome, got: $OUT" ;;
 esac
 case "$OUT" in

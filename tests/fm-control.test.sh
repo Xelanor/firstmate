@@ -731,6 +731,35 @@ test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped() {
   pass "fm-control unblock: a re-ring swallowed by a busy pane reports skipped, not rang"
 }
 
+# The third case: the re-ring's submit verdict proves nothing either way - the
+# composer geometry is ambiguous right after the turn starts rendering, so the
+# read is pending-unproven (an unreadable capture gives `unknown` the same way).
+# The doorbell may be sitting unsubmitted in that composer, so this must not be
+# reported as a landed ring and must not clear the ladder's attempt history for
+# a worker that may still be unreachable.
+test_unblock_rering_with_an_unproven_verdict_is_not_reported_as_rang() {
+  local dir out rc
+  dir=$(new_case unblock-rering-unproven)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  write_composer_pane "$dir" "$(printf '\xe2\x9d\xaf a doorbell line typed but never submitted')" "$(printf '\xe2\x9d\xaf')"
+  # A box composer opening on the capture's first row: the typed doorbell line
+  # is visible but its shape runs off the top, so the verdict is unproven.
+  printf '\xe2\x95\xad\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xae\n\xe2\x94\x82 : Firstmate instruction waiting \xe2\x94\x82\n\xe2\x95\xb0\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x95\xaf\n' \
+    > "$dir/fake/pane-on-literal"
+  write_inbox_record "$dir" t1 "please continue"
+  printf '001.msg\n' > "$dir/home/state/t1.inbox/.escalated"
+  out=$(run_control "$dir" t1 unblock); rc=$?
+  expect_code 0 "$rc" "the submit itself was verified, so the verb still succeeds"
+  assert_contains "$out" "composer=submitted ring=unproven" \
+    "a re-ring whose submit could not be read must not claim it landed"
+  [ "$(ladder_count "$dir" t1)" != 0 ] \
+    || fail "an unproven re-ring must keep the ladder's attempt history, not restart it"
+  [ ! -e "$dir/home/state/t1.inbox/.escalated" ] \
+    || fail "an unproven re-ring must still re-arm surfacing so the condition returns"
+  pass "fm-control unblock: a re-ring with an unproven submit verdict is neither rang nor a ladder reset"
+}
+
 # The mirror case, and the one the shared queued-Enter policy exists for: a
 # harness that accepts the re-ring's Enter mid-turn but keeps the typed text
 # visible (opencode's queued Enter). The ring's own submit verdict resolves
@@ -1140,6 +1169,7 @@ test_resume_is_refused_with_its_reason
 test_relaunch_only_flags_are_rejected_on_other_verbs
 test_unblock_submits_pending_text_and_rings
 test_unblock_rering_swallowed_by_a_busy_pane_reports_skipped
+test_unblock_rering_with_an_unproven_verdict_is_not_reported_as_rang
 test_unblock_rering_queued_behind_a_busy_turn_reports_rang
 test_unblock_already_clear_composer_rings_without_submitting
 test_unblock_refuses_when_composer_state_is_unreadable
