@@ -1,0 +1,19 @@
+# pooled shape (worktree linked to a sibling clone of the same origin)
+spawning home's registered project : /tmp/fm-agy-harness.KpDGr5/pooled/project
+acquired pool worktree             : /tmp/fm-agy-harness.KpDGr5/pooled/wt
+worktree's real primary checkout   : /tmp/fm-agy-harness.KpDGr5/pooled/other-clone
+same origin on both clones         : /tmp/fm-agy-harness.KpDGr5/pooled/other-clone.origin.git | file:///tmp/fm-agy-harness.KpDGr5/pooled/other-clone.origin.git
+
+# spawn output
+warning: /tmp/fm-agy-harness.KpDGr5/pooled/home/data/agy-pooled-z15-31092/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+spawned agy-pooled-z15-31092 harness=agy kind=ship mode=no-mistakes yolo=off window=firstmate:fm-agy-pooled-z15-31092 worktree=/tmp/fm-agy-harness.KpDGr5/pooled/wt
+
+# agy trust store after the spawn (HOME/.gemini/antigravity-cli/settings.json)
+{
+  "model": "Gemini 3.8 Flash (High)",
+  "trustedWorkspaces": [
+    "/home/someone/elsewhere",
+    "/tmp/fm-agy-harness.KpDGr5/pooled/wt"
+  ]
+}
+# Enter key sends into the pane (launch only, no dialog answer): 1

@@ -1,0 +1,22 @@
+Regression check for the pooled-worktree agy trust derivation.
+Same test, same fixture; only bin/fm-spawn.sh differs.
+
+--- BEFORE the fix (bin/fm-spawn.sh restored to base a09090d) ---
+$ bin/fm-test-run.sh tests/fm-agy-harness.test.sh
+not ok - a worktree pooled against a sibling clone failed trust pre-registration (unexpected: 'could not pre-register')
+error: refusing to pre-register agy trust: '<tmp>/pooled/wt' is not a worktree of project '<tmp>/pooled/project'
+warning: could not pre-register agy workspace trust for <tmp>/pooled/wt; the launch will answer the folder-trust dialog in window firstmate:fm-agy-pooled-z15-91905 instead
+spawned agy-pooled-z15-91905 harness=agy kind=ship ... worktree=<tmp>/pooled/wt
+FM_TEST_SUMMARY total=1 failed=1
+
+--- AFTER the fix (target 51cf453) ---
+$ bin/fm-test-run.sh tests/fm-agy-harness.test.sh
+ok - fm-spawn: agy pre-trusts a worktree pooled against a sibling clone of its project's own origin
+ok - fm-spawn: agy never pre-trusts a sibling clone's primary checkout the derivation names
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0
+
+--- Mutation check that the new adversarial case is not vacuous ---
+With bin/fm-agy-trust.sh's primary-checkout refusal removed, the spawn pre-registered
+a whole sibling clone and the adversarial case failed:
+not ok - a refused primary checkout did not surface the registration warning
+(both the helper and the test file were restored afterwards)

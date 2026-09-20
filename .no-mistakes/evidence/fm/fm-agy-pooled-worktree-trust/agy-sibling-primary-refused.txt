@@ -1,0 +1,12 @@
+# adversarial shape: acquired path is a SIBLING CLONE'S PRIMARY CHECKOUT
+acquired path : /tmp/fm-agy-harness.KpDGr5/sibling-primary/sibling-clone
+
+# spawn output
+warning: /tmp/fm-agy-harness.KpDGr5/sibling-primary/home/data/agy-sibling-primary-z16-31092/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: refusing to pre-register agy trust: '/tmp/fm-agy-harness.KpDGr5/sibling-primary/sibling-clone' is a primary checkout, not an isolated worktree
+warning: could not pre-register agy workspace trust for /tmp/fm-agy-harness.KpDGr5/sibling-primary/sibling-clone; the launch will answer the folder-trust dialog in window firstmate:fm-agy-sibling-primary-z16-31092 instead
+spawned agy-sibling-primary-z16-31092 harness=agy kind=ship mode=no-mistakes yolo=off window=firstmate:fm-agy-sibling-primary-z16-31092 worktree=/tmp/fm-agy-harness.KpDGr5/sibling-primary/sibling-clone
+
+# agy trust store after the spawn - the clone must NOT be listed
+{"model":"Gemini 3.8 Flash (High)","trustedWorkspaces":["/home/someone/elsewhere"]}
+# Enter key sends (launch + one dialog answer): 2
