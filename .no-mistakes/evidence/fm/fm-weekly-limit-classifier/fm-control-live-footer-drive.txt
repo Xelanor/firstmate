@@ -1,0 +1,26 @@
+### A. exit a quota-stopped grok worker whose composer is EMPTY (live footer)
+  rc=0
+  stopped la1 harness=grok backend=tmux endpoint=fmses:fm-la1 worktree=/tmp/fm-control-relaunch.tP5aCv/liveA-30190/wt
+    work preserved: branch=task-la1 WIP.txt intact worktree=/tmp/fm-control-relaunch.tP5aCv/liveA-30190/wt
+  PASS A
+### B. same drive against the PRE-FIX build (a09090d)
+  rc=1
+  error: task lb1's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+  PASS B (pre-fix refusal reproduced: recovery was blocked)
+### C. relaunch the quota-stopped grok worker (branch-preserving recovery)
+  rc=0
+  warning: /tmp/fm-control-relaunch.tP5aCv/liveC-19455/home/data/lc1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+relaunched lc1 harness=grok from=grok model=default effort=default backend=tmux endpoint=fmses:fm-lc1 worktree=/tmp/fm-control-relaunch.tP5aCv/liveC-19455/wt
+    work preserved: branch=task-lc1 WIP.txt intact worktree=/tmp/fm-control-relaunch.tP5aCv/liveC-19455/wt
+  PASS C
+### D. adversarial: pending text under the same live footer must still refuse
+  rc=1
+  error: task ld1's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+    work preserved: branch=task-ld1 WIP.txt intact worktree=/tmp/fm-control-relaunch.tP5aCv/liveD-31957/wt
+  PASS D
+### E. adversarial: an untaught separator glyph must stay unproven, not silently pass
+  rc=1
+  error: task le1's composer state is 'unknown', not proven empty; refusing to type the /exit exit command because it could concatenate onto existing text. Clear the composer, then retry 'exit'
+    work preserved: branch=task-le1 WIP.txt intact worktree=/tmp/fm-control-relaunch.tP5aCv/liveE-26949/wt
+  PASS E
+ALL LIVE-SHAPE CONTROL SCENARIOS PASSED

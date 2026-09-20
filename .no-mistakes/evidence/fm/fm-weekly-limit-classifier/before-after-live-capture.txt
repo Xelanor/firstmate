@@ -1,0 +1,7 @@
+=== live grok 1.0.34 idle pane (weekly-limit footer), classified from the REAL capture ===
+--- BEFORE the fix (bin/fm-composer-lib.sh @ a09090d) ---
+herdr (cursorless, styled): unknown
+cmux/orca (plain):          unknown
+--- AFTER the fix (bin/fm-composer-lib.sh @ b8441a1) ---
+herdr (cursorless, styled): empty
+cmux/orca (plain):          empty

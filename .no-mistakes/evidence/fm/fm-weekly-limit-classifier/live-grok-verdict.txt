@@ -1,0 +1,8 @@
+== live grok 1.0.34 idle composer box, byte-exact from tmux capture ==
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                                                                                                                                                                    │
+  ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── Weekly limit left: 4% · Grok 4.6 (medium) · always-approve ─╯
+
+== real tmux classifier verdict (bin/fm-tmux-lib.sh, fm_tmux_composer_state) ==
+pre-fix  (a09090d): unknown  (never reached empty in a 45s budget)
+post-fix (b8441a1): empty    (reached in 2s)
