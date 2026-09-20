@@ -72,7 +72,7 @@ Before the derivation, the spawn still succeeded and the gate answered the dialo
 ```text
 not ok - a worktree pooled against a sibling clone failed trust pre-registration (unexpected: 'could not pre-register')
 error: refusing to pre-register agy trust: '<tmp>/wt' is not a worktree of project '<tmp>/project'
-warning: could not pre-register agy workspace trust for <tmp>/wt; the launch will answer the folder-trust dialog in window firstmate:fm-agy-pooled-z15-70118 instead
+warning: could not pre-register agy workspace trust for <tmp>/wt; the launch will answer the folder-trust dialog in window firstmate:fm-agy-pooled-<id> instead
 ```
 
 After `bin/fm-spawn.sh` derived the agy-trust `<project>` argument from the worktree's own git common dir, the same run and the full existing suite passed, including every prior dialog, race, and fail-and-close case:
@@ -88,7 +88,7 @@ The spawn therefore does not depend on it: after pre-registration, `bin/fm-spawn
 It polls the pane capture, answers the dialog with a single Enter the first time the `Do you trust the contents of this project?` text renders, and reports success only once `fm_busy_classify` returns a busy verdict for the pane (Herdr's native `working` status or the pinned `esc to cancel` status row).
 Because Herdr's native `working` verdict is known to coexist with an unanswered dialog, the gate is strict about order: a busy verdict counts as ready only when the worktree was pre-registered before launch or the dialog has already been seen and answered; on an unregistered path it keeps polling for the dialog instead of accepting the early busy verdict.
 When the brief cannot be confirmed to run within the window (an answered dialog never turns busy, a pre-trusted pane never turns busy, or an unregistered pane never shows the dialog), the spawn fails, records `failed:` in the task status, and closes the endpoint so no orphan worker survives outside task control.
-`tests/fm-agy-harness.test.sh` covers the helper's registration and scope refusals against a throwaway store, and drives a fake pane whose dialog decision reads the store the spawn just wrote: the pre-trusted launch with no dialog, a pooled-sibling worktree pre-trusted through its real primary checkout, a dialog that renders anyway answered exactly once, the premature busy verdict on an unregistered path waiting for the dialog, and both fail-and-close paths.
+`tests/fm-agy-harness.test.sh` covers the helper's registration and scope refusals against a throwaway store, and drives a fake pane whose dialog decision reads the store the spawn just wrote: the pre-trusted launch with no dialog, a pooled-sibling worktree pre-trusted through its real primary checkout, a sibling clone's primary checkout that the same derivation names but the scope test still refuses (the spawn warns and falls back rather than trusting a whole checkout), a dialog that renders anyway answered exactly once, the premature busy verdict on an unregistered path waiting for the dialog, and both fail-and-close paths.
 
 ## Model and effort
 

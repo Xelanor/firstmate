@@ -805,6 +805,41 @@ test_agy_spawn_trusts_a_worktree_pooled_against_a_sibling_clone() {
   pass "fm-spawn: agy pre-trusts a worktree pooled against a sibling clone of its project's own origin"
 }
 
+# ADVERSARIAL COUNTERPART to the pooled case above. The isolation guard that
+# screens the acquired path compares the candidate's git dir against the
+# SPAWNING project's common dir, so a primary checkout of a DIFFERENT clone of
+# the same origin is not the spawning project and passes that screen. Deriving
+# the agy-trust <project> argument from the worktree's own common dir names
+# that same checkout, so the derivation must not turn into a way to assert
+# trust for a primary checkout: the helper's scope test still has to refuse it,
+# the store must stay clean, and the spawn must take the warn-and-answer
+# fallback instead of pre-registering a whole clone.
+test_agy_spawn_refuses_to_pre_trust_a_sibling_primary_checkout() {
+  local id rec out rc store sibling enters
+  id="agy-sibling-primary-z16-$$"
+  rec=$(make_agy_spawn_case sibling-primary "$id")
+  read_agy_spawn_record "$rec"
+  store="$HOME_DIR/.gemini/antigravity-cli/settings.json"
+  sibling="$CASE_DIR/sibling-clone"
+  git clone --quiet "$PROJ_DIR.origin.git" "$sibling"
+  out=$(run_agy_spawn "$CASE_DIR" "$HOME_DIR" "$PROJ_DIR" "$sibling" "$FAKEBIN_DIR" "$id" \
+    --model gemini-3.8-flash-low)
+  rc=$?
+  expect_code 0 "$rc" "the spawn should still reach its brief through the dialog fallback: $out"
+  assert_contains "$out" "could not pre-register agy workspace trust" \
+    "a refused primary checkout did not surface the registration warning"
+  assert_agy_not_trusted "$store" "$sibling" \
+    "the derivation pre-registered a sibling clone's primary checkout in agy's trust store"
+  assert_agy_trusted "$store" "/home/someone/elsewhere" \
+    "a refused registration rewrote the store it was supposed to leave alone"
+  [ "$(cat "$CASE_DIR/agy.state")" = busy ] \
+    || fail "the fallback reported success before the pane reached a busy turn (state: $(cat "$CASE_DIR/agy.state"))"
+  enters=$(count_enter_sends "$CASE_DIR/tmux-calls.log")
+  [ "$enters" -eq 2 ] \
+    || fail "the refused path must fall back to answering the dialog exactly once, got $enters Enter sends"
+  pass "fm-spawn: agy never pre-trusts a sibling clone's primary checkout the derivation names"
+}
+
 test_agy_dialog_despite_registration_is_answered_once() {
   local id rec out rc enters
   id="agy-vendor-z10-$$"
@@ -960,6 +995,7 @@ test_agy_trust_creates_a_missing_store
 test_agy_trust_refuses_out_of_scope_paths
 test_agy_fresh_worktree_is_pre_trusted_and_launches_without_a_dialog
 test_agy_spawn_trusts_a_worktree_pooled_against_a_sibling_clone
+test_agy_spawn_refuses_to_pre_trust_a_sibling_primary_checkout
 test_agy_dialog_despite_registration_is_answered_once
 test_agy_unregistered_path_ignores_busy_until_the_dialog_is_answered
 test_agy_unregistered_path_without_a_dialog_fails_the_spawn
