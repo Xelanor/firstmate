@@ -1,0 +1,33 @@
+setup: real Claude Code pane up, composer empty
+setup: the 2026-09-20 incident state reproduced - a real doorbell line sits unsubmitted in a real Claude composer
+
+### SCENARIO A: watcher escalation names the skipped-doorbell condition
+--- ladder state (.ring-state) ---
+001.msg^I1^I1789949383^Iskipped-pending
+--- wake queue reason the supervisor actually reads ---
+1789949385	1	stale	fm-lab-unblock-scen-60001-8237:w1:p1	stale: fm-lab-unblock-scen-60001-8237:w1:p1 (unread firstmate instruction: /tmp/fm-unblock-scen.5zb31q/home/state/unblock-scen.inbox/001.msg is unhandled and the worker cannot receive messages: its input line holds unsubmitted text, so every doorbell delivery attempt was skipped. It is not an idle-pane wedge. Restore steerability in place with bin/fm-control.sh unblock-scen unblock, which submits the stuck text and re-rings without stopping the agent)
+--- watcher stdout ---
+stale: fm-lab-unblock-scen-60001-8237:w1:p1 (unread firstmate instruction: /tmp/fm-unblock-scen.5zb31q/home/state/unblock-scen.inbox/001.msg is unhandled and the worker cannot receive messages: its input line holds unsubmitted text, so every doorbell delivery attempt was skipped. It is not an idle-pane wedge. Restore steerability in place with bin/fm-control.sh unblock-scen unblock, which submits the stuck text and re-rings without stopping the agent)
+
+### SCENARIO B: unblock recovers the worker in place
+rc=0
+unblocked unblock-scen harness=claude backend=herdr composer=submitted ring=rang endpoint=fm-lab-unblock-scen-60001-8237:w1:p1
+--- ladder after unblock ---
+001.msg^I0^I1789949387^I
+--- .escalated present? ---
+ls: cannot access '/tmp/fm-unblock-scen.5zb31q/home/state/unblock-scen.inbox/.escalated': No such file or directory
+worker acknowledged 001.msg: yes; ran the instruction: yes
+
+### SCENARIO C: unblock on an already-clear composer is idempotent and never restarts the ladder
+--- ladder before (count=2, outcome=skipped-pending) ---
+002.msg	2	1789949393	skipped-pending
+composer reads: empty
+rc=0
+unblocked unblock-scen harness=claude backend=herdr composer=already-clear ring=rang endpoint=fm-lab-unblock-scen-60001-8237:w1:p1
+--- ladder after (count must NOT be 0) ---
+002.msg	3	1789949395	rang
+
+### SCENARIO D: unblock refuses a dead agent instead of typing into a dead pane
+agent state now: dead
+rc=1
+error: no agent is running at task unblock-scen's recorded endpoint (state: dead); the unblocked doorbell would land in a dead pane - recover the worker instead
