@@ -27,10 +27,15 @@
 #   <task>.inbox/handled/      the worker's `mv` here IS the acknowledgement
 #   <task>.inbox/.seq.lock     serializes sequence allocation across writers
 #                              (the session and the away daemon)
-#   <task>.inbox/.ring-state   watcher re-ring ladder:
+#   <task>.inbox/.ring-state   delivery-attempt ladder, written by the watcher's
+#                              re-ring loop and by the control plane's unblock
+#                              re-ring:
 #                              "<msg>\t<count>\t<epoch>\t<last-outcome>" where
-#                              <last-outcome> is rang or skipped-pending
-#                              (empty for any other or a pre-outcome ladder)
+#                              <last-outcome> is rang or skipped-pending: the
+#                              most recent attempt that proved either, carried
+#                              forward across attempts that proved neither
+#                              (empty when no attempt on this record ever
+#                              proved one, or for a pre-outcome ladder)
 #   <task>.inbox/.escalated    oldest-message name already surfaced as stale,
 #                              so later polls suppress another escalation
 #
