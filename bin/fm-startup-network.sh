@@ -29,7 +29,10 @@
 #     state/.startup-network.report and reaches the agent either inline in the
 #     digest or, when it finishes too late for the digest to inline it, as a
 #     `check: startup-network` wake. Inactive-scan findings land directly in the
-#     ordinary durable wake queue. The report wakes only when the late result is
+#     ordinary durable wake queue. After those sweeps, a read-only
+#     `fm-queued-recheck.sh --with-pr` pass appends any merged-PR still-true
+#     warnings to the same report and refreshes `state/.queued-recheck-pr`; it
+#     never closes a backlog record. The report wakes only when the late result is
 #     itself actionable (state is not "done", or bootstrap emitted something
 #     other than its explicit BOOTSTRAP_INFO no-action record;
 #     report_requires_wake owns that transport test). A late-finishing clean run is not captain-facing progress
@@ -578,11 +581,25 @@ EOF
       bash -c '
         script_dir=$1
         "$script_dir/fm-inactive-reconcile.sh" scan --startup >/dev/null 2>&1 || true
-        exec "$script_dir/fm-bootstrap.sh"
+        "$script_dir/fm-bootstrap.sh"
+        status=$?
+        # Read-only still-true re-check of queued records whose named PRs have
+        # merged. The scan never closes a record; a failure must not hide the
+        # bootstrap result that already ran.
+        "$script_dir/fm-queued-recheck.sh" --section --with-pr || true
+        exit "$status"
       ' _ "$SCRIPT_DIR" >"$out" 2>&1 || rc=$?
   else
-    fm_run_timed "$budget" env FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=1 \
-      "$SCRIPT_DIR/fm-bootstrap.sh" >"$out" 2>&1 || rc=$?
+    # shellcheck disable=SC2016  # Child-shell variables expand inside the bound.
+    fm_run_timed "$budget" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=1 \
+      bash -c '
+        script_dir=$1
+        "$script_dir/fm-bootstrap.sh"
+        status=$?
+        "$script_dir/fm-queued-recheck.sh" --section --with-pr || true
+        exit "$status"
+      ' _ "$SCRIPT_DIR" >"$out" 2>&1 || rc=$?
   fi
   [ "$lease_held" -eq 0 ] || fm_lock_release "$STATE/.lock.acquire"
   # The bounded run as a whole, so the per-phase records can be read against the
