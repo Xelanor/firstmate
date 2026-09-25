@@ -1,0 +1,24 @@
+== proof-no-mistakes
+# Rules
+1. Never push to the default branch. Never merge a PR.
+2. Stay inside this worktree; the only files you may write outside it are the status file and the firstmate-home files this brief names.
+   Any firstmate-home file the Task or spec names as `data/proof-no-mistakes/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fm-lab.30wHHV/data/proof-no-mistakes/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.
+3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
+== proof-direct-PR
+# Rules
+1. Never push to the default branch (push only your `fm/proof-direct-PR` branch). Never merge a PR.
+2. Stay inside this worktree; the only files you may write outside it are the status file and the firstmate-home files this brief names.
+   Any firstmate-home file the Task or spec names as `data/proof-direct-PR/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fm-lab.30wHHV/data/proof-direct-PR/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.
+3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
+== proof-local-only
+# Rules
+1. Never push to any remote and never open a PR. Work only on your `fm/proof-local-only` branch; firstmate handles the merge into local `main`.
+2. Stay inside this worktree; the only files you may write outside it are the status file and the firstmate-home files this brief names.
+   Any firstmate-home file the Task or spec names as `data/proof-local-only/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fm-lab.30wHHV/data/proof-local-only/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.
+3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
+== proof-scout
+# Rules
+1. Never push to any remote and never open a PR.
+2. Stay inside this worktree; the only files you may write outside it are the report, the status file below, and the firstmate-home files this brief names.
+   Any firstmate-home file the Task or spec names as `data/proof-scout/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fm-lab.30wHHV/data/proof-scout/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.
+3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.

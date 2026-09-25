@@ -1,0 +1,5 @@
+== promoted brief (scout -> ship no-mistakes)
+23:2. Stay inside this worktree; the only files you may write outside it are the report, the status file below, and the firstmate-home files this brief names.
+24:   Any firstmate-home file the Task or spec names as `data/proof-scout/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fm-lab.30wHHV/data/proof-scout/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.
+92:7. Everything else in your original instructions carries over unchanged: the status protocol; the instruction inbox and its acknowledgement; the escalation rules, including ask-user; and every safety rule, except where the current delivery contract below explicitly replaces scout-only delivery rules.
+kind=ship

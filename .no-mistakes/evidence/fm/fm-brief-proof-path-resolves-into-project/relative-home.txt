@@ -1,0 +1,3 @@
+scaffolded: /tmp/fmsp.KBBe/lab home/data/rel-home/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+exit=0
+   Any firstmate-home file the Task or spec names as `data/rel-home/<file>` or `data/<task-id>/<file>` means the absolute `/tmp/fmsp.KBBe/lab home/data/rel-home/<file>` in the firstmate home, never a path inside this worktree; write it at that absolute path.

@@ -1,0 +1,6 @@
+== old: project worktree /tmp/fmproj-old.ainy
+ M README.md
+?? data/
+./data/live-proof/code-review.md
+== old: firstmate home
+brief.md

@@ -1,0 +1,5 @@
+== new: project worktree /tmp/fmproj-new.K4aR
+ M README.md
+== new: firstmate home
+brief.md
+code-review.md
