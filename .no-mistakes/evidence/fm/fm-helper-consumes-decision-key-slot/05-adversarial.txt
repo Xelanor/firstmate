@@ -1,0 +1,18 @@
+$ FM_HOME=$MATE bin/fm-secondmate-report.sh needs-decision [key=bad key] c1e80ab326af7548 malformed
+error: [key=...] slug must be nonempty A-Za-z0-9._- (got '[key=bad key]')
+exit=1
+$ FM_HOME=$MATE bin/fm-secondmate-report.sh needs-decision [key=] c1e80ab326af7548 empty
+error: [key=...] slug must be nonempty A-Za-z0-9._- (got '[key=]')
+exit=1
+$ FM_HOME=$MATE bin/fm-secondmate-report.sh needs-decision [key=a]: [key=b] c1e80ab326af7548 conflict
+error: conflicting decision keys 'b' and 'a'
+exit=1
+$ FM_HOME=$MATE bin/fm-secondmate-report.sh needs-decision [key=color] not-a-corr bad corr
+error: corr_id must be 16 hex characters (got 'not-a-corr')
+exit=1
+$ FM_HOME=$MATE bin/fm-secondmate-report.sh needs-decision [key=color]
+Usage:
+  fm-secondmate-report.sh <verb> [[key=<slug>]] <corr_id> <note...>
+  fm-secondmate-report.sh --doc <verb> [[key=<slug>]] <corr_id> <doc-path> <note...>
+exit=2
+status lines before=5 after=5

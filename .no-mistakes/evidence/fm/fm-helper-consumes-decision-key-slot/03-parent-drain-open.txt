@@ -1,0 +1,6 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+mate [key=color] needs-decision: pick a wall color (via-helper)
+mate [key=trim] needs-decision: pick a trim (via-helper)
+mate [key=doc-key] needs-decision: see the report (data/x/report.md via-helper)
+mate needs-decision: which vendor (via-helper)
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

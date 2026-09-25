@@ -1,0 +1,5 @@
+== BASE (dbe124d) helper ==
+$ FM_HOME=$MATE fm-secondmate-report.sh bin/.base-report.sh needs-decision [key=color] c1e80ab326af7548 pick a wall color
+error: corr_id must be 16 hex characters (got '[key=color]')
+exit=1
+parent status:
