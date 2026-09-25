@@ -1,0 +1,11 @@
+ok - a spawned record with no worktree identity refuses until --empty-outcome is passed
+ok - a scout with no report refuses until --empty-outcome is passed
+ok - --empty-outcome clears a spawned record with no worktree identity and records why
+ok - --empty-outcome clears a scout that produced no report without writing one
+ok - --empty-outcome still refuses an identifiable worktree that holds unlanded work
+ok - --empty-outcome still refuses an identifiable worktree with uncommitted changes
+ok - --empty-outcome never guesses among ambiguous worktree identities
+ok - --empty-outcome still refuses a scout that holds an open captain decision
+ok - --empty-outcome refuses a scout whose report exists
+ok - --empty-outcome refuses a task that records a PR
+ok - --empty-outcome clears a local-only task while local main is ahead of the remote

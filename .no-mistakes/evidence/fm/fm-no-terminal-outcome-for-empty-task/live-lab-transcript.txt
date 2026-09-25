@@ -1,0 +1,193 @@
+# live lab: FM_HOME=$LAB (marked lab home), private tmux socket fm-lab, real treehouse/git/tasks-axi
+
+## S1 GAP 1: spawned ship record with spawn_gen but no worktree= line
+===== [s1-plain] $ FM_HOME=$LAB bin/fm-teardown.sh lab-nowt    (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| REFUSED: task lab-nowt has a missing, empty, or ambiguous worktree identity; preserving task state.
+  stderr| Pass --empty-outcome when this task ran and produced no deliverable and there is no copy to inspect.
+  meta present: yes
+  tmux window fm-lab-nowt alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-nowt - lab lab-nowt (kind: ship) (since 2026-09-25)
+===== [s1-legacy] $ FM_HOME=$LAB bin/fm-teardown.sh lab-nowt --legacy-record   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| REFUSED: task lab-nowt has a missing, empty, or ambiguous worktree identity; preserving task state.
+  stderr| Pass --empty-outcome when this task ran and produced no deliverable and there is no copy to inspect.
+  meta present: yes
+  tmux window fm-lab-nowt alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-nowt - lab lab-nowt (kind: ship) (since 2026-09-25)
+===== [s1-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-nowt --empty-outcome   (exit 0)
+  stdout| proj: already current
+  stdout| teardown lab-nowt complete (window firstmate:fm-lab-nowt, worktree none, empty outcome: produced no deliverable)
+  stdout| Backlog: lab-nowt is closed in $LAB/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  stderr| ●  WATCHER DOWN - SUPERVISION IS OFF
+  stderr| ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  stderr| ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  stderr| ●  This is a supervision warning only; the guarded operation WILL still run.
+  stderr| ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  meta present: no
+  tmux window fm-lab-nowt alive: no
+  report.md present: no
+  backlog: state=done closed=2026-09-25 links=none body=produced no deliverable 
+  backlog.md| 6:- [x] lab-nowt - lab lab-nowt (kind: ship) (done 2026-09-25)
+
+## S2 GAP 2: scout with a real leased worktree that never wrote report.md
+leased: $LAB/home/.treehouse/proj-a17ed8/1/proj
+===== [s2-plain] $ FM_HOME=$LAB bin/fm-teardown.sh lab-scout    (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  stderr| ●  WATCHER DOWN - SUPERVISION IS OFF
+  stderr| ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  stderr| ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  stderr| ●  This is a supervision warning only; the guarded operation WILL still run.
+  stderr| ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  stderr| REFUSED: scout task lab-scout has no report at $LAB/data/lab-scout/report.md.
+  stderr| The report is the work product. Have the crewmate write it, pass --empty-outcome when the task ran and produced no deliverable, or use --force after explicit discard approval.
+  meta present: yes
+  tmux window fm-lab-scout alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-scout - lab lab-scout (kind: scout) (since 2026-09-25)
+===== [s2-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-scout --empty-outcome   (exit 0)
+  stdout| A new version of treehouse is available: v2.1.1 → v2.3.0
+  stdout| Run "treehouse update" to update
+  stdout| 
+  stdout| 🌳 Worktree returned to pool.
+  stdout| teardown lab-scout complete (window firstmate:fm-lab-scout, worktree $LAB/home/.treehouse/proj-a17ed8/1/proj, empty outcome: produced no deliverable)
+  stdout| Backlog: lab-scout is closed in $LAB/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  meta present: no
+  tmux window fm-lab-scout alive: no
+  report.md present: no
+  backlog: state=done closed=2026-09-25 links=none body=produced no deliverable 
+  backlog.md| 6:- [x] lab-scout - lab lab-scout (kind: scout) (done 2026-09-25)
+  treehouse status after:
+    A new version of treehouse is available: v2.1.1 → v2.3.0
+    Run "treehouse update" to update
+    
+    1     available    ~/.treehouse/proj-a17ed8/1/proj
+
+## S3 adversarial: scout that DID write report.md
+===== [s3-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-report --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| REFUSED: --empty-outcome is only for a task that produced no deliverable, but task lab-report has one: its report exists at $LAB/data/lab-report/report.md.
+  stderr| Tear it down without --empty-outcome (bin/fm-teardown.sh lab-report) so the backlog records that deliverable.
+  meta present: yes
+  tmux window fm-lab-report alive: yes
+  report.md present: yes
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-report - lab lab-report (kind: scout) (since 2026-09-25)
+
+## S4 adversarial: ship task that recorded a PR
+===== [s4-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-pr --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| REFUSED: --empty-outcome is only for a task that produced no deliverable, but task lab-pr has one: it records PR https://github.com/example/repo/pull/7.
+  stderr| Tear it down without --empty-outcome (bin/fm-teardown.sh lab-pr) so the backlog records that deliverable.
+  meta present: yes
+  tmux window fm-lab-pr alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-pr - lab lab-pr (kind: ship) (since 2026-09-25)
+
+## S5 adversarial: scout with an open captain decision
+===== [s5-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-decide --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| REFUSED: scout task lab-decide still has an open captain decision (api-shape).
+  stderr| --empty-outcome does not close a captain call. Inventory it through bin/fm-captain-hold.sh, or answer it, then retry.
+  meta present: yes
+  tmux window fm-lab-decide alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-decide - lab lab-decide (kind: scout) (since 2026-09-25)
+
+## S6 adversarial: identifiable worktree holding an unlanded commit
+===== [s6-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-unlanded --empty-outcome   (exit 0)
+  stdout| A new version of treehouse is available: v2.1.1 → v2.3.0
+  stdout| Run "treehouse update" to update
+  stdout| 
+  stdout| 🌳 Worktree returned to pool.
+  stdout| proj: already current
+  stdout| teardown lab-unlanded complete (window firstmate:fm-lab-unlanded, worktree $LAB/home/.treehouse/proj-a17ed8/1/proj, empty outcome: produced no deliverable)
+  stdout| Backlog: lab-unlanded is closed in $LAB/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  meta present: no
+  tmux window fm-lab-unlanded alive: no
+  report.md present: no
+  backlog: state=done closed=2026-09-25 links=none body=produced no deliverable 
+  backlog.md| 9:- [x] lab-unlanded - lab lab-unlanded (kind: ship) (done 2026-09-25)
+
+## S7 adversarial: identifiable worktree with uncommitted changes
+===== [s7-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-dirty --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| REFUSED: worktree $LAB/home/.treehouse/proj-a17ed8/1/proj has uncommitted changes.
+  stderr| uncommitted changes present
+  stderr| Commit them (or get the captain's explicit OK to discard, then --force).
+  meta present: yes
+  tmux window fm-lab-dirty alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-dirty - lab lab-dirty (kind: scout) (since 2026-09-25)
+
+## S8 adversarial: two worktree= lines (ambiguous identity)
+===== [s8-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-ambig --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| REFUSED: task lab-ambig has a missing, empty, or ambiguous worktree identity; preserving task state.
+  meta present: yes
+  tmux window fm-lab-ambig alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-ambig - lab lab-ambig (kind: ship) (since 2026-09-25)
+
+## S9 adversarial: secondmate record
+===== [s9-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-mate --empty-outcome   (exit 2)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| error: --empty-outcome is for ship and scout records that produced no deliverable, not secondmate retirement
+  meta present: yes
+  tmux window fm-lab-mate alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-mate - lab lab-mate (kind: ship) (since 2026-09-25)
+
+## S10 local-only project whose local main is ahead of origin; task committed nothing
+  origin/main..main: 1 commit(s) ahead; task HEAD == main: yes
+===== [s10-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-localonly --empty-outcome   (exit 0)
+  stdout| A new version of treehouse is available: v2.1.1 → v2.3.0
+  stdout| Run "treehouse update" to update
+  stdout| 
+  stdout| 🌳 Worktree returned to pool.
+  stdout| teardown lab-localonly complete (window firstmate:fm-lab-localonly, worktree $LAB/home/.treehouse/proj-a17ed8/2/proj, empty outcome: produced no deliverable)
+  stdout| Backlog: lab-localonly is closed in $LAB/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  meta present: no
+  tmux window fm-lab-localonly alive: no
+  report.md present: no
+  backlog: state=done closed=2026-09-25 links=none body=produced no deliverable 
+  backlog.md| 12:- [x] lab-localonly - lab lab-localonly (kind: ship) (done 2026-09-25)
+
+## Final Done section of $LAB/data/backlog.md
+## Done
+- [x] lab-localonly - lab lab-localonly (kind: ship) (done 2026-09-25)
+  produced no deliverable
+- [x] lab-unlanded - lab lab-unlanded (kind: ship) (done 2026-09-25)
+  produced no deliverable
+- [x] lab-scout - lab lab-scout (kind: scout) (done 2026-09-25)
+  produced no deliverable
+- [x] lab-nowt - lab lab-nowt (kind: ship) (done 2026-09-25)
+  produced no deliverable
+
+# lab removed: yes

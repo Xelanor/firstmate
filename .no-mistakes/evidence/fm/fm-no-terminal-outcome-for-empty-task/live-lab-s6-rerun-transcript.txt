@@ -1,0 +1,36 @@
+# S6 re-run: the first run used an empty commit, which teardown's content check correctly treats as landed.
+## S6 adversarial: identifiable worktree on branch fm/lab-unlanded holding a commit with real unlanded content
+===== [s6-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-unlanded --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  stderr| ●  WATCHER DOWN - SUPERVISION IS OFF
+  stderr| ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  stderr| ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  stderr| ●  This is a supervision warning only; the guarded operation WILL still run.
+  stderr| ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+  stderr| ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  stderr| REFUSED: worktree $LAB/home/.treehouse/proj-86c874/1/proj has work not on any remote and not landed.
+  stderr| unpushed commits:
+  stderr| 954c0a7 real unlanded work
+  stderr| Push the branch, land its PR, or get the captain's explicit OK to discard, then --force.
+  meta present: yes
+  tmux window fm-lab-unlanded alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-unlanded - lab lab-unlanded (kind: ship) (since 2026-09-25)
+  commit still in worktree: 954c0a7 real unlanded work
+## S6b same record via local-only mode (not merged into main, not on any remote)
+===== [s6b-empty] $ FM_HOME=$LAB bin/fm-teardown.sh lab-lo-unlanded --empty-outcome   (exit 1)
+  stderr| fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+  stderr| WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  stderr| REFUSED: local-only worktree $LAB/home/.treehouse/proj-86c874/2/proj has work not yet merged into main and not on any remote.
+  stderr| commits not yet on main:
+  stderr| 0eab0d5 real local-only work
+  stderr| Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+  meta present: yes
+  tmux window fm-lab-lo-unlanded alive: yes
+  report.md present: no
+  backlog: state=in_flight closed="-" links=none body="" 
+  backlog.md| 4:- [ ] lab-lo-unlanded - lab lab-lo-unlanded (kind: ship) (since 2026-09-25)
+
+# lab removed: yes
