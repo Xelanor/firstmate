@@ -1,0 +1,10 @@
+# status line: captain-held [key=route]: awaiting the captain on the routing call
+=== watcher run 1 (10:34:15) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:34:20) ===
+stale: crew:parked (captain-held 13s, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)
+--- watcher exit=0 ---
+=== watcher run 3 (10:34:31) ===
+--- watcher exit=124 ---
+DRIVER-DONE

@@ -1,0 +1,12 @@
+=== watcher run 1 (10:28:59) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:29:03) ===
+stale: crew:parked
+--- watcher exit=0 ---
+=== watcher run 3 (10:29:11) ===
+--- watcher exit=124 ---
+=== watcher run 4 (10:30:13) ===
+check: rearm-resurface
+--- watcher exit=0 ---
+DRIVER-DONE

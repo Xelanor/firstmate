@@ -1,0 +1,10 @@
+# status line: paused: waiting on the vendor release until 2026-01-01T00:00Z
+=== watcher run 1 (10:37:01) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:37:06) ===
+stale: crew:parked (paused 11s, awaiting external - the declared clearing time has passed, rechecked on a long cadence not a wedge; confirm the wait cleared)
+--- watcher exit=0 ---
+=== watcher run 3 (10:37:14) ===
+--- watcher exit=124 ---
+DRIVER-DONE

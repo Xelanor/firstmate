@@ -1,0 +1,11 @@
+=== watcher run 1 (10:30:29) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:30:33) ===
+stale: crew:parked (paused 11s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+--- watcher exit=0 ---
+=== watcher run 3 (10:30:41) ===
+--- watcher exit=124 ---
+=== watcher run 4 (10:31:43) ===
+--- watcher exit=124 ---
+DRIVER-DONE

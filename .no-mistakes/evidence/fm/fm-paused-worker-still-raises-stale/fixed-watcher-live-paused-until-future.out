@@ -1,0 +1,9 @@
+# status line: paused: waiting on the vendor release until 2027-06-01T00:00Z
+=== watcher run 1 (10:38:17) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:38:21) ===
+--- watcher exit=124 ---
+=== watcher run 3 (10:39:23) ===
+--- watcher exit=124 ---
+DRIVER-DONE

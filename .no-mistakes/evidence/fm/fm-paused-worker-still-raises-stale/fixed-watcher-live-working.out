@@ -1,0 +1,10 @@
+# status line: working: running the build, will report back
+=== watcher run 1 (10:33:00) ===
+signal: /tmp/fm-lab.kDLpcI/state/parked.status
+--- watcher exit=0 ---
+=== watcher run 2 (10:33:04) ===
+stale: crew:parked
+--- watcher exit=0 ---
+=== watcher run 3 (10:33:13) ===
+--- watcher exit=124 ---
+DRIVER-DONE
