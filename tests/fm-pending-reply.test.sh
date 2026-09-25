@@ -1491,25 +1491,17 @@ test_helper_preserves_worker_decision_key() {
   fm_pending_reply_try_resolve "$state" "$corr" \
     || fail "the keyed helper line must still resolve the pending-reply expectation"
 
-  corr=$(fm_pending_reply_create "$home" "$state" mate "key inside the verb")
+  corr=$(fm_pending_reply_create "$home" "$state" mate "key with a colon on the verb")
   fm_pending_reply_mark_delivered "$state" "$corr"
   : > "$state/mate.status"
-  FM_HOME="$sm_home" "$REPORT" "needs-decision [key=verb-slot]" "$corr" "from the verb" \
-    || fail "helper must keep a [key=...] already attached to the verb"
+  FM_HOME="$sm_home" "$REPORT" "needs-decision [key=verb-slot]:" "$corr" "from the verb" \
+    || fail "helper must split a trailing-colon [key=...]: off the verb"
   fold=$(status_open_decisions "$state/mate.status")
   expected=$(printf 'verb-slot\tneeds-decision\tfrom the verb (via-helper)\n')
   [ "$fold" = "$expected" ] \
-    || fail "a key attached to the verb must survive: got '$fold'"
-
-  corr=$(fm_pending_reply_create "$home" "$state" mate "key at the note head")
-  fm_pending_reply_mark_delivered "$state" "$corr"
-  : > "$state/mate.status"
-  FM_HOME="$sm_home" "$REPORT" needs-decision "$corr" "[key=note-head] from the note" \
-    || fail "helper must keep a [key=...] at the head of the note"
-  fold=$(status_open_decisions "$state/mate.status")
-  expected=$(printf 'note-head\tneeds-decision\tfrom the note (via-helper)\n')
-  [ "$fold" = "$expected" ] \
-    || fail "a key at the note head must be lifted into the decision, not left as default: got '$fold'"
+    || fail "a trailing-colon key on the verb must open that key: got '$fold'"
+  grep -Fq "corr=$corr" "$state/mate.status" \
+    || fail "a trailing-colon verb key must not push the correlation id into the note"
 
   corr=$(fm_pending_reply_create "$home" "$state" mate "doc pointer with a key")
   fm_pending_reply_mark_delivered "$state" "$corr"

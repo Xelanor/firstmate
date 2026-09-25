@@ -20,10 +20,10 @@
 #
 # The optional [key=<slug>] token is the same decision key a worker would put
 # between the verb and the colon on a plain status line. Pass it as its own
-# argument, attach it to the verb, or put it at the head of the note; the
-# helper emits it in that documented slot next to the correlation id so a
-# via-helper needs-decision stays closable with --resolve-key. A line with no
-# key still opens the shared default key, as before.
+# argument after the verb; the helper emits it in that documented slot next
+# to the correlation id so a via-helper needs-decision stays closable with
+# --resolve-key. A line with no key still opens the shared default key, as
+# before.
 #
 # Examples:
 #   fm-secondmate-report.sh done abcdef0123456789 "audit clean"
@@ -73,48 +73,19 @@ _fm_report_set_key() {  # <slug>
   KEY=$slug
 }
 
-# If the verb's last word is a [key=<slug>] token, split it off so the helper
-# can place corr and key in separate slots instead of leaving a colon inside
-# the verb (which would push the correlation id into the note).
+# A verb that ends in "[key=<slug>]:" would leave a colon inside the verb and
+# push the correlation id into the note, so split that token off the verb.
 _fm_report_split_verb_key() {
   local last slug prefix
   case "$VERB" in
-    *' [key='*']'|*' [key='*']:')
+    *' [key='*']:')
       last=${VERB##* }
       if slug=$(_fm_report_key_token_slug "$last"); then
         prefix=${VERB% *}
-        prefix=${prefix%:}
         [ -n "$prefix" ] || usage
         VERB=$prefix
         _fm_report_set_key "$slug"
       fi
-      ;;
-  esac
-}
-
-# Lift a note-head [key=<slug>] into the documented before-colon slot when the
-# worker had nowhere else to put it. A key already taken from the verb or a
-# dedicated token wins, and a leftover note-head token stays note text.
-_fm_report_lift_note_key() {
-  local rest slug
-  rest=${NOTE#"${NOTE%%[![:space:]]*}"}
-  case "$rest" in
-    \[key=*\]*)
-      slug=${rest#\[key=}
-      slug=${slug%%\]*}
-      _fm_decision_slug_ok "$slug" || return 0
-      rest=${rest#\[key="$slug"\]}
-      case "$rest" in
-        :*) rest=${rest#:} ;;
-      esac
-      rest=${rest#"${rest%%[![:space:]]*}"}
-      if [ -n "$KEY" ]; then
-        [ "$KEY" = "$slug" ] || return 0
-        NOTE=$rest
-        return 0
-      fi
-      KEY=$slug
-      NOTE=$rest
       ;;
   esac
 }
@@ -190,10 +161,6 @@ if [ "$DOC_MODE" = 1 ]; then
   NOTE=$*
 else
   NOTE=$*
-fi
-_fm_report_lift_note_key
-if [ "$DOC_MODE" != 1 ] && [ -z "$NOTE" ]; then
-  usage
 fi
 key_tag=
 if [ -n "$KEY" ]; then
