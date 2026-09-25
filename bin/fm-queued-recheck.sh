@@ -198,7 +198,7 @@ while IFS= read -r id || [ -n "${id:-}" ]; do
     FINDINGS="${FINDINGS}${id}"$'\t'"report"$'\t'"${report_rel}"$'\n'
   fi
   if [ "$WITH_PR" -eq 1 ]; then
-    show=$(fm_backlog_row_show "$DATA_ABS" "$id") || continue
+    show=$(fm_backlog_row_show "$DATA_ABS" "$id" --full) || continue
     urls=$(collect_pr_links "$(show_field "$show" links)" "$(show_field "$show" title)")
     while IFS= read -r url || [ -n "${url:-}" ]; do
       [ -n "$url" ] || continue

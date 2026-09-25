@@ -209,6 +209,38 @@ test_title_prose_url_is_not_a_named_pr() {
   pass "mid-title PR URL is not a named PR"
 }
 
+test_long_title_prose_url_is_not_a_named_pr() {
+  local home out
+  home=$(make_home long-title-pr)
+  # tasks-axi show truncates titles past 80 characters, which would cut the
+  # mid-title URL and hide it from the title check.
+  tasks_in "$home" add long-cite \
+    "Follow-up to the regression and review fallout from https://github.com/acme/maker/pull/1824 still needs a proper fix" \
+    --kind ship >/dev/null
+  printf 'MERGED\n' > "$home/pr-state"
+  out=$(run_recheck "$home" --with-pr) \
+    || fail "forge scan failed on a long title URL"
+  [ -z "$out" ] || fail "a PR URL cited mid-title in a long title was treated as a named PR: $out"
+  pass "mid-title PR URL in a long title is not a named PR"
+}
+
+test_long_title_trailing_pr_link_still_surfaces() {
+  local home out
+  home=$(make_home long-title-trailing-pr)
+  tasks_in "$home" add long-link \
+    "Fix after the shared release branch fallout from https://github.com/acme/maker/pull/1824 lands" \
+    --kind ship --pr https://github.com/acme/maker/pull/1830 >/dev/null
+  printf 'MERGED\n' > "$home/pr-state"
+  out=$(run_recheck "$home" --with-pr) \
+    || fail "forge scan failed on a long title with a trailing link"
+  assert_contains "$out" $'long-link\tpr\thttps://github.com/acme/maker/pull/1830' \
+    "a --pr link at the end of a long title produced no re-check line"
+  case "$out" in
+    *pull/1824*) fail "the mid-title citation in a long title was treated as a named PR: $out" ;;
+  esac
+  pass "trailing --pr link on a long title still surfaces"
+}
+
 test_forge_failure_keeps_the_previous_merged_cache_line() {
   local home out
   home=$(make_home pr-cache-forge-failure)
@@ -283,6 +315,8 @@ test_merged_named_pr_surfaces_only_with_forge_read
 test_open_named_pr_is_silent
 test_body_url_is_not_a_named_pr
 test_title_prose_url_is_not_a_named_pr
+test_long_title_prose_url_is_not_a_named_pr
+test_long_title_trailing_pr_link_still_surfaces
 test_forge_failure_keeps_the_previous_merged_cache_line
 test_with_pr_cache_lets_local_rescan_skip_the_forge
 test_section_flag_never_claims_to_close_anything
