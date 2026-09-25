@@ -77,6 +77,10 @@
 # on that forge. bin/fm-spawn.sh reads that line and refuses to launch a ship task
 # whose explicit --mode or registered forge disagrees, so an adjusted brief and the
 # recorded task metadata cannot drift apart.
+# Ship briefs name the absolute firstmate-home review-proof path
+# `$DATA/<task-id>/code-review.md` so a worker cannot resolve it inside the
+# project worktree. Rule 2 carves that write (and the other firstmate-home
+# files the brief names) out of the stay-inside-the-worktree rule.
 # Ship briefs begin with a worktree-isolation assertion before the branch step.
 # Both crewmate scaffolds carry one shared rule against administering the
 # infrastructure every lane shares - the no-mistakes daemon and the worktree pool
@@ -348,6 +352,21 @@ When a terminal message says an instruction is waiting there - and at any natura
 The move IS the acknowledgement: without it firstmate rings again and eventually treats you as stuck. An empty or absent inbox needs no action.
 EOF
 INBOX_SECTION=${INBOX_SECTION%$'\n'}
+
+# Ship workers write firstmate-private review evidence to this absolute home
+# path. A relative data/<task-id>/code-review.md resolves inside the project
+# worktree, so the file can reach a PR while teardown never sees a home copy.
+PROOF_SECTION=
+if [ "$KIND" = ship ]; then
+  PROOF_FILE="$DATA/$ID/code-review.md"
+  IFS= read -r -d '' PROOF_SECTION <<EOF || true
+# Review proof
+Write firstmate-private review evidence to \`$PROOF_FILE\`.
+That path is in the firstmate home, not this worktree.
+Never write a relative \`data/<task-id>/...\` path for this file: it resolves inside the project and can reach a PR, while teardown would drop the home copy that was never written.
+EOF
+  PROOF_SECTION=${PROOF_SECTION%$'\n'}
+fi
 
 if [ "$KIND" = secondmate ]; then
 SECONDMATE_PROJECTS=""
@@ -621,7 +640,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 
 # Rules
 $RULE1
-2. Stay inside this worktree; modify nothing outside it.
+2. Stay inside this worktree; the only files you may write outside it are the status file, the review proof, and any findings snapshot this brief names.
 3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
 4. Report status by appending one line:
    \`$STATUS_APPEND\`
@@ -649,6 +668,8 @@ $ASK_USER_BLOCK
 $SHARED_INFRA_RULE
 
 $INBOX_SECTION
+
+$PROOF_SECTION
 
 # Project memory
 A project's \`AGENTS.md\` or \`CLAUDE.md\` is loaded into every agent session in that project, so edit it only to correct information that is factually wrong - including information your own change made wrong - and never to add knowledge because it is missing.

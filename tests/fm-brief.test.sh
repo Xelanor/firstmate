@@ -484,6 +484,63 @@ test_ask_user_escalation_format() {
   pass "fm-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot"
 }
 
+# A relative data/<task-id>/code-review.md proof path resolves inside the
+# worker's project worktree. Workers then commit firstmate-private review
+# evidence into the project, and teardown never sees the home copy. The
+# scaffold must emit the absolute firstmate-home path and allow writing it.
+test_ship_proof_path_is_absolute_firstmate_home() {
+  local home id brief proof wt mode
+  home="$TMP_ROOT/proof-path-home"
+  mkdir -p "$home/data"
+  home=$(cd "$home" && pwd -P)
+  wt="$TMP_ROOT/proof-path-project"
+  mkdir -p "$wt"
+
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-proof-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1
+    brief="$home/data/$id/brief.md"
+    proof="$home/data/$id/code-review.md"
+    assert_present "$brief" "$mode brief was not scaffolded"
+    assert_grep "$proof" "$brief" \
+      "$mode brief must name the absolute firstmate-home review-proof path"
+    case "$proof" in
+      /*) ;;
+      *) fail "$mode proof path is not absolute: $proof" ;;
+    esac
+    # The relative form is a suffix of the absolute path, so count how the
+    # worker is told to write it: every code-review.md mention must carry the
+    # home prefix, and rule 2 must not forbid that outside-worktree write.
+    if grep -F 'code-review.md' "$brief" | grep -Fv "$proof" >/dev/null; then
+      fail "$mode brief names code-review.md without the absolute firstmate-home prefix"
+    fi
+    assert_no_grep "2. Stay inside this worktree; modify nothing outside it." "$brief" \
+      "$mode rule 2 still forbids the outside-worktree proof write the brief requires"
+    assert_grep "review proof" "$brief" \
+      "$mode rule 2 must carve out the review proof as a permitted firstmate-home write"
+
+    # Behavior: from the project worktree, the relative path lands in the
+    # project, while the path the brief names lands in the firstmate home.
+    rm -f "$proof" "$wt/data/$id/code-review.md"
+    (
+      cd "$wt" || exit 1
+      mkdir -p "data/$id"
+      printf 'relative\n' > "data/$id/code-review.md"
+      printf 'absolute\n' > "$proof"
+    ) || fail "$mode could not write the relative and absolute proof paths from the project worktree"
+    assert_present "$wt/data/$id/code-review.md" \
+      "$mode relative proof write did not land in the project worktree"
+    assert_present "$proof" \
+      "$mode absolute proof write did not land in the firstmate home"
+    grep -qx relative "$wt/data/$id/code-review.md" \
+      || fail "$mode relative write did not stay in the project"
+    grep -qx absolute "$proof" \
+      || fail "$mode absolute write did not stay in the firstmate home"
+  done
+
+  pass "fm-brief.sh: ship review-proof path is absolute in the firstmate home"
+}
+
 # The project-memory section bounds crewmate edits of a project's AGENTS.md or
 # CLAUDE.md to corrections of factually wrong information - including wrong
 # information the task itself introduced - and never invites additions of
@@ -998,7 +1055,8 @@ test_scout_and_secondmate_scaffold() {
   brief="$BRIEF_HOME/data/brief-scout-q6/brief.md"
   assert_present "$brief" "scout brief was not scaffolded"
   assert_grep "SCOUT task" "$brief" "scout brief must declare itself a scout task"
-  assert_grep "report.md" "$brief" "scout brief must point at the report deliverable"
+  assert_grep "$BRIEF_HOME/data/brief-scout-q6/report.md" "$brief" \
+    "scout brief must point at the absolute firstmate-home report path"
   assert_grep "## Captain's intent" "$brief" "scout brief missing Captain's intent subsection"
   assert_grep "## Firstmate spec" "$brief" "scout brief missing Firstmate spec subsection"
   assert_grep "{FIRSTMATE_SPEC}" "$brief" "scout brief missing the spec placeholder"
@@ -1329,6 +1387,7 @@ test_no_mistakes_dod_wording
 test_no_mistakes_dod_green_detection
 test_pr_based_dod_requires_non_draft
 test_ask_user_escalation_format
+test_ship_proof_path_is_absolute_firstmate_home
 test_ship_project_memory_wording
 test_herdr_lab_contract_is_explicit_and_complete
 test_herdr_lab_contract_quotes_foreign_firstmate_path
