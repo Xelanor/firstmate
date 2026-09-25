@@ -183,17 +183,36 @@ test_open_named_pr_is_silent() {
   pass "open named PR stays silent"
 }
 
-test_body_url_counts_as_a_named_pr() {
+test_body_url_is_not_a_named_pr() {
   local home out
   home=$(make_home body-pr)
-  tasks_in "$home" add leftover "Cleanup after landing" --kind ship \
-    --body "Landed as https://github.com/acme/maker/pull/1824 yesterday." >/dev/null
+  tasks_in "$home" add followup "Regression cleanup" --kind ship \
+    --body "Regression from https://github.com/acme/maker/pull/1824 yesterday." >/dev/null
   printf 'MERGED\n' > "$home/pr-state"
   out=$(run_recheck "$home" --with-pr) \
     || fail "forge scan failed on a body URL"
-  assert_contains "$out" $'leftover\tpr\thttps://github.com/acme/maker/pull/1824' \
-    "a PR URL in the body was not treated as a named PR"
-  pass "body URL counts as a named PR"
+  [ -z "$out" ] || fail "a PR URL cited only in the body was treated as a named PR: $out"
+  [ ! -s "$home/gh.log" ] || fail "a body-only PR URL caused a forge read: $(cat "$home/gh.log")"
+  pass "body PR URL is not a named PR"
+}
+
+test_forge_failure_keeps_the_previous_merged_cache_line() {
+  local home out
+  home=$(make_home pr-cache-forge-failure)
+  tasks_in "$home" add cached-pr "Cached merged PR" --kind ship \
+    --pr https://github.com/acme/maker/pull/5 >/dev/null
+  printf 'MERGED\n' > "$home/pr-state"
+  run_recheck "$home" --with-pr >/dev/null || fail "forge scan failed while filling cache"
+
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$home/fakebin/gh"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$home/fakebin/gh-axi"
+  out=$(run_recheck "$home" --with-pr) || fail "forge scan failed when gh was unavailable"
+  assert_contains "$out" $'cached-pr\tpr\thttps://github.com/acme/maker/pull/5' \
+    "a failed forge read dropped the confirmed merged-PR finding"
+  out=$(run_recheck "$home") || fail "local rescan failed"
+  assert_contains "$out" $'cached-pr\tpr\thttps://github.com/acme/maker/pull/5' \
+    "a failed forge read deleted the confirmed merged-PR cache line"
+  pass "a failed forge read keeps the previous merged-PR cache line"
 }
 
 test_with_pr_cache_lets_local_rescan_skip_the_forge() {
@@ -249,7 +268,8 @@ test_held_queued_report_is_silent
 test_symlink_report_is_ignored
 test_merged_named_pr_surfaces_only_with_forge_read
 test_open_named_pr_is_silent
-test_body_url_counts_as_a_named_pr
+test_body_url_is_not_a_named_pr
+test_forge_failure_keeps_the_previous_merged_cache_line
 test_with_pr_cache_lets_local_rescan_skip_the_forge
 test_section_flag_never_claims_to_close_anything
 test_drain_prints_the_queued_report_warning

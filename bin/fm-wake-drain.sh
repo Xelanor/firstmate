@@ -623,10 +623,11 @@ print_status_presentation() {  # [<deduped-raw-rows>]
     fi
   fi
   if [ "$rc" -eq 0 ] && [ -n "$snapshot" ]; then print_status_sections "$snapshot" "$fully_presented" || rc=1; fi
-  # Backlog-vs-disk, independent of status logs: a home with no .status files
-  # can still have a queued record whose report already exists.
-  print_still_true_recheck_section || rc=1
   fm_lock_release "$lock"
+  # Backlog-vs-disk, independent of status logs: a home with no .status files
+  # can still have a queued record whose report already exists. It reads no
+  # presentation state, so it runs outside the presentation lock.
+  print_still_true_recheck_section || rc=1
   return "$rc"
 }
 

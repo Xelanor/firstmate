@@ -15,9 +15,10 @@
 # `data/<id>/report.md` exists as a regular file, plus any previously confirmed
 # merged-PR lines still matching those records (state/.queued-recheck-pr).
 # It makes no forge call, so session-start and every wake drain can run it.
-# `--with-pr` additionally reads named PR URLs from each record (structured
-# `pr:` links, title, and body) and asks the forge whether that URL has merged.
-# Successful merged-PR findings replace the cache; a forge miss skips that URL.
+# `--with-pr` additionally reads named PR URLs from each record's structured
+# `pr:` links (never title or body prose) and asks the forge whether each has
+# merged. Merged-PR findings replace the cache; when a forge read fails, the
+# previous cache line for that record and URL is kept.
 # `--section` wraps the same findings in the agent-facing STILL-TRUE RE-CHECK
 # heading; empty findings print nothing.
 #
@@ -76,42 +77,36 @@ show_field() {  # <show-output> <field>
   printf '%s\n' "$1" | sed -n "s/^  $2: //p" | head -1
 }
 
-# Tokenize prose and structured links into candidate URLs, then keep only the
-# ones fm_pr_url_parse accepts. Trailing markdown punctuation is stripped so a
-# body sentence can name the PR without a second structured field.
-collect_pr_urls_from_text() {  # <text>
-  local text=$1 token
-  printf '%s\n' "$text" | tr ' \t<>"'"'"',' '\n' | while IFS= read -r token || [ -n "$token" ]; do
+# Only structured `pr:` links name a PR. A URL cited in the title or body is
+# prose (often the PR that caused the bug), not the work this record tracks.
+collect_pr_links() {  # <links-field>
+  local token
+  printf '%s\n' "$1" | tr ' \t<>"'"'"',' '\n' | while IFS= read -r token || [ -n "$token" ]; do
     case "$token" in
       pr:https://*|pr:http://*) token=${token#pr:} ;;
+      *) continue ;;
     esac
-    while [ -n "$token" ]; do
-      last=${token#"${token%?}"}
-      case "$last" in
-        ')'|','|'.'|';'|':') token=${token%?} ;;
-        *) break ;;
-      esac
-    done
     token=${token%/}
     fm_pr_url_parse "$token" || continue
     printf '%s\n' "$FM_PR_URL"
   done | LC_ALL=C sort -u
 }
 
+# Exit 0 merged, 1 not merged, 2 the forge read failed.
 pr_is_merged() {  # <url>
-  fm_pr_url_parse "$1" || return 1
+  fm_pr_url_parse "$1" || return 2
   case "$FM_PR_PROVIDER" in
     github)
-      fm_pr_github_read_record "$FM_PR_OWNER" "$FM_PR_REPO" "$FM_PR_NUMBER" || return 1
+      fm_pr_github_read_record "$FM_PR_OWNER" "$FM_PR_REPO" "$FM_PR_NUMBER" || return 2
       ;;
     gitlab)
-      fm_pr_gitlab_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 1
+      fm_pr_gitlab_read_record "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" || return 2
       ;;
     gerrit)
-      fm_pr_gerrit_read_record "$FM_PR_HOST" "$FM_PR_NUMBER" || return 1
+      fm_pr_gerrit_read_record "$FM_PR_HOST" "$FM_PR_NUMBER" || return 2
       ;;
     *)
-      return 1
+      return 2
       ;;
   esac
   [ "${FM_PR_RECORD_MERGED:-}" = true ]
@@ -156,6 +151,11 @@ command -v tasks-axi >/dev/null 2>&1 || exit 0
 DATA_ABS=$(fm_backlog_data_absolute "$DATA" 2>/dev/null) || exit 0
 IDS=$(queued_unheld_ids "$DATA_ABS") || exit 0
 
+PR_CACHE_OLD=
+if [ -f "$CACHE" ] && [ ! -L "$CACHE" ] && [ -r "$CACHE" ]; then
+  PR_CACHE_OLD=$(cat "$CACHE" 2>/dev/null || true)
+fi
+
 FINDINGS=
 PR_CACHE_NEW=
 while IFS= read -r id || [ -n "${id:-}" ]; do
@@ -167,12 +167,16 @@ while IFS= read -r id || [ -n "${id:-}" ]; do
   fi
   if [ "$WITH_PR" -eq 1 ]; then
     show=$(fm_backlog_row_show "$DATA_ABS" "$id") || continue
-    urls=$(collect_pr_urls_from_text "$(show_field "$show" links)
-$(show_field "$show" title)
-$(show_field "$show" body)")
+    urls=$(collect_pr_links "$(show_field "$show" links)")
     while IFS= read -r url || [ -n "${url:-}" ]; do
       [ -n "$url" ] || continue
-      pr_is_merged "$url" || continue
+      merged=0
+      pr_is_merged "$url" || merged=$?
+      if [ "$merged" -eq 2 ]; then
+        id_in_list "$PR_CACHE_OLD" "${id}"$'\t'"pr"$'\t'"${url}" || continue
+      elif [ "$merged" -ne 0 ]; then
+        continue
+      fi
       FINDINGS="${FINDINGS}${id}"$'\t'"pr"$'\t'"${url}"$'\n'
       PR_CACHE_NEW="${PR_CACHE_NEW}${id}"$'\t'"pr"$'\t'"${url}"$'\n'
     done <<EOF
@@ -185,14 +189,16 @@ EOF
 
 if [ "$WITH_PR" -eq 1 ]; then
   write_cache "$PR_CACHE_NEW" || true
-elif [ -f "$CACHE" ] && [ ! -L "$CACHE" ] && [ -r "$CACHE" ]; then
+else
   while IFS=$(printf '\t') read -r cid kind url || [ -n "${cid:-}" ]; do
     [ -n "$cid" ] || continue
     [ "$kind" = pr ] || continue
     [ -n "$url" ] || continue
     id_in_list "$IDS" "$cid" || continue
     FINDINGS="${FINDINGS}${cid}"$'\t'"pr"$'\t'"${url}"$'\n'
-  done < "$CACHE"
+  done <<EOF
+$PR_CACHE_OLD
+EOF
 fi
 
 if [ -z "$FINDINGS" ]; then

@@ -30,11 +30,13 @@
 #     digest or, when it finishes too late for the digest to inline it, as a
 #     `check: startup-network` wake. Inactive-scan findings land directly in the
 #     ordinary durable wake queue. After those sweeps, a read-only
-#     `fm-queued-recheck.sh --with-pr` pass appends any merged-PR still-true
-#     warnings to the same report and refreshes `state/.queued-recheck-pr`; it
+#     `fm-queued-recheck.sh --with-pr` pass, bounded by what the stage budget
+#     has left, appends any merged-PR still-true warnings to the same report as
+#     QUEUED_RECHECK_INFO lines and refreshes `state/.queued-recheck-pr`; it
 #     never closes a backlog record. The report wakes only when the late result is
 #     itself actionable (state is not "done", or bootstrap emitted something
-#     other than its explicit BOOTSTRAP_INFO no-action record;
+#     other than its explicit BOOTSTRAP_INFO no-action record, with
+#     QUEUED_RECHECK_INFO lines treated the same way;
 #     report_requires_wake owns that transport test). A late-finishing clean run is not captain-facing progress
 #     (AGENTS.md section 8) and never becomes a wake row; it is still durable
 #     in the report file for `... report` to read on demand. Only a durable
@@ -355,7 +357,7 @@ report_requires_wake() {  # <state>
   local state=$1
   [ "$state" = "done" ] || return 0
   [ -s "$REPORT_FILE" ] || return 1
-  awk 'NF && $0 !~ /^BOOTSTRAP_INFO:/ { found=1; exit } END { exit !found }' \
+  awk 'NF && $0 !~ /^(BOOTSTRAP_INFO|QUEUED_RECHECK_INFO):/ { found=1; exit } END { exit !found }' \
     "$REPORT_FILE" 2>/dev/null
 }
 
@@ -481,7 +483,7 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
 }
 
 cmd_run() {  # <locked> <lock-pid> <generation>
-  local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 timings stage_started stage_deadline
+  local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 recheck timings stage_started stage_deadline
   mkdir -p "$STATE" 2>/dev/null || return 1
   started=$(now)
   budget=$(stage_budget)
@@ -581,27 +583,23 @@ EOF
       bash -c '
         script_dir=$1
         "$script_dir/fm-inactive-reconcile.sh" scan --startup >/dev/null 2>&1 || true
-        "$script_dir/fm-bootstrap.sh"
-        status=$?
-        # Read-only still-true re-check of queued records whose named PRs have
-        # merged. The scan never closes a record; a failure must not hide the
-        # bootstrap result that already ran.
-        "$script_dir/fm-queued-recheck.sh" --section --with-pr || true
-        exit "$status"
+        exec "$script_dir/fm-bootstrap.sh"
       ' _ "$SCRIPT_DIR" >"$out" 2>&1 || rc=$?
   else
-    # shellcheck disable=SC2016  # Child-shell variables expand inside the bound.
-    fm_run_timed "$budget" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-      FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=1 \
-      bash -c '
-        script_dir=$1
-        "$script_dir/fm-bootstrap.sh"
-        status=$?
-        "$script_dir/fm-queued-recheck.sh" --section --with-pr || true
-        exit "$status"
-      ' _ "$SCRIPT_DIR" >"$out" 2>&1 || rc=$?
+    fm_run_timed "$budget" env FM_BOOTSTRAP_NETWORK=only FM_BOOTSTRAP_DETECT_ONLY=1 \
+      "$SCRIPT_DIR/fm-bootstrap.sh" >"$out" 2>&1 || rc=$?
   fi
   [ "$lease_held" -eq 0 ] || fm_lock_release "$STATE/.lock.acquire"
+  # Read-only still-true re-check of queued records whose named PRs have
+  # merged, under its own bound from what bootstrap left of the stage budget,
+  # so a slow forge can never turn a finished bootstrap into a stage timeout.
+  # Its lines are informational and never make the report wake-worthy alone.
+  if [ "$rc" -eq 0 ]; then
+    recheck=$(fm_run_timed "$(seconds_until "$stage_deadline")" \
+      env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/fm-queued-recheck.sh" --section --with-pr 2>/dev/null) || recheck=
+    [ -z "$recheck" ] || printf '%s\n' "$recheck" | sed 's/^/QUEUED_RECHECK_INFO: /' >> "$out"
+  fi
   # The bounded run as a whole, so the per-phase records can be read against the
   # total even when the bound cut some of them off.
   fm_timing_record stage network-checks "$stage_started" "$phases"
