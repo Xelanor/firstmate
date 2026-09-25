@@ -484,61 +484,42 @@ test_ask_user_escalation_format() {
   pass "fm-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot"
 }
 
-# A relative data/<task-id>/code-review.md proof path resolves inside the
-# worker's project worktree. Workers then commit firstmate-private review
-# evidence into the project, and teardown never sees the home copy. The
-# scaffold must emit the absolute firstmate-home path and allow writing it.
-test_ship_proof_path_is_absolute_firstmate_home() {
-  local home id brief proof wt mode
-  home="$TMP_ROOT/proof-path-home"
+# A relative data/<task-id>/... firstmate-home path named by a Task or spec
+# resolves inside the worker's project worktree. Workers then commit
+# firstmate-private files into the project, and the home copy is never written.
+# Every crewmate scaffold must map that form to the absolute home path and let
+# the worker write it.
+test_home_data_path_rule_is_absolute_firstmate_home() {
+  local home id brief abs kind
+  home="$TMP_ROOT/home-data-path-home"
   mkdir -p "$home/data"
   home=$(cd "$home" && pwd -P)
-  wt="$TMP_ROOT/proof-path-project"
-  mkdir -p "$wt"
 
-  for mode in no-mistakes direct-PR local-only; do
-    id="brief-proof-$mode"
-    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1
-    brief="$home/data/$id/brief.md"
-    proof="$home/data/$id/code-review.md"
-    assert_present "$brief" "$mode brief was not scaffolded"
-    assert_grep "$proof" "$brief" \
-      "$mode brief must name the absolute firstmate-home review-proof path"
-    case "$proof" in
-      /*) ;;
-      *) fail "$mode proof path is not absolute: $proof" ;;
-    esac
-    # The relative form is a suffix of the absolute path, so count how the
-    # worker is told to write it: every code-review.md mention must carry the
-    # home prefix, and rule 2 must not forbid that outside-worktree write.
-    if grep -F 'code-review.md' "$brief" | grep -Fv "$proof" >/dev/null; then
-      fail "$mode brief names code-review.md without the absolute firstmate-home prefix"
+  for kind in no-mistakes direct-PR local-only scout; do
+    id="brief-home-path-$kind"
+    if [ "$kind" = scout ]; then
+      FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --scout >/dev/null 2>&1
+    else
+      FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$kind" >/dev/null 2>&1
     fi
-    assert_no_grep "2. Stay inside this worktree; modify nothing outside it." "$brief" \
-      "$mode rule 2 still forbids the outside-worktree proof write the brief requires"
-    assert_grep "review proof" "$brief" \
-      "$mode rule 2 must carve out the review proof as a permitted firstmate-home write"
-
-    # Behavior: from the project worktree, the relative path lands in the
-    # project, while the path the brief names lands in the firstmate home.
-    rm -f "$proof" "$wt/data/$id/code-review.md"
-    (
-      cd "$wt" || exit 1
-      mkdir -p "data/$id"
-      printf 'relative\n' > "data/$id/code-review.md"
-      printf 'absolute\n' > "$proof"
-    ) || fail "$mode could not write the relative and absolute proof paths from the project worktree"
-    assert_present "$wt/data/$id/code-review.md" \
-      "$mode relative proof write did not land in the project worktree"
-    assert_present "$proof" \
-      "$mode absolute proof write did not land in the firstmate home"
-    grep -qx relative "$wt/data/$id/code-review.md" \
-      || fail "$mode relative write did not stay in the project"
-    grep -qx absolute "$proof" \
-      || fail "$mode absolute write did not stay in the firstmate home"
+    brief="$home/data/$id/brief.md"
+    abs="$home/data/$id/<file>"
+    assert_present "$brief" "$kind brief was not scaffolded"
+    case "$abs" in
+      /*) ;;
+      *) fail "$kind home data path is not absolute: $abs" ;;
+    esac
+    assert_grep "\`data/$id/<file>\` or \`data/<task-id>/<file>\` means the absolute \`$abs\` in the firstmate home, never a path inside this worktree" "$brief" \
+      "$kind brief must map a relative data/<task-id>/ path to the absolute firstmate-home path"
+    assert_grep "the firstmate-home files this brief names." "$brief" \
+      "$kind rule 2 must permit writing the firstmate-home files the brief names"
+    assert_no_grep "modify nothing outside it" "$brief" \
+      "$kind rule 2 still forbids the firstmate-home writes the brief requires"
+    assert_no_grep "code-review.md" "$brief" \
+      "$kind brief must not add a dedicated review-proof deliverable"
   done
 
-  pass "fm-brief.sh: ship review-proof path is absolute in the firstmate home"
+  pass "fm-brief.sh: crewmate briefs map data/<task-id>/ paths to the absolute firstmate home"
 }
 
 # The project-memory section bounds crewmate edits of a project's AGENTS.md or
@@ -1387,7 +1368,7 @@ test_no_mistakes_dod_wording
 test_no_mistakes_dod_green_detection
 test_pr_based_dod_requires_non_draft
 test_ask_user_escalation_format
-test_ship_proof_path_is_absolute_firstmate_home
+test_home_data_path_rule_is_absolute_firstmate_home
 test_ship_project_memory_wording
 test_herdr_lab_contract_is_explicit_and_complete
 test_herdr_lab_contract_quotes_foreign_firstmate_path
