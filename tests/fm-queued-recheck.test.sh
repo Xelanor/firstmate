@@ -196,6 +196,19 @@ test_body_url_is_not_a_named_pr() {
   pass "body PR URL is not a named PR"
 }
 
+test_title_prose_url_is_not_a_named_pr() {
+  local home out
+  home=$(make_home title-pr)
+  tasks_in "$home" add title-cite "Follow-up to https://github.com/acme/maker/pull/1824 fallout" \
+    --kind ship >/dev/null
+  printf 'MERGED\n' > "$home/pr-state"
+  out=$(run_recheck "$home" --with-pr) \
+    || fail "forge scan failed on a title URL"
+  [ -z "$out" ] || fail "a PR URL cited mid-title was treated as a named PR: $out"
+  [ ! -s "$home/gh.log" ] || fail "a mid-title PR URL caused a forge read: $(cat "$home/gh.log")"
+  pass "mid-title PR URL is not a named PR"
+}
+
 test_forge_failure_keeps_the_previous_merged_cache_line() {
   local home out
   home=$(make_home pr-cache-forge-failure)
@@ -269,6 +282,7 @@ test_symlink_report_is_ignored
 test_merged_named_pr_surfaces_only_with_forge_read
 test_open_named_pr_is_silent
 test_body_url_is_not_a_named_pr
+test_title_prose_url_is_not_a_named_pr
 test_forge_failure_keeps_the_previous_merged_cache_line
 test_with_pr_cache_lets_local_rescan_skip_the_forge
 test_section_flag_never_claims_to_close_anything

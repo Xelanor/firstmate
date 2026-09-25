@@ -77,19 +77,51 @@ show_field() {  # <show-output> <field>
   printf '%s\n' "$1" | sed -n "s/^  $2: //p" | head -1
 }
 
-# Only structured `pr:` links name a PR. A URL cited in the title or body is
-# prose (often the PR that caused the bug), not the work this record tracks.
-collect_pr_links() {  # <links-field>
+canonical_pr_urls() {  # <text>
   local token
   printf '%s\n' "$1" | tr ' \t<>"'"'"',' '\n' | while IFS= read -r token || [ -n "$token" ]; do
+    token=${token#pr:}
     case "$token" in
-      pr:https://*|pr:http://*) token=${token#pr:} ;;
+      https://*|http://*) ;;
       *) continue ;;
     esac
     token=${token%/}
     fm_pr_url_parse "$token" || continue
     printf '%s\n' "$FM_PR_URL"
   done | LC_ALL=C sort -u
+}
+
+# Only structured `pr:` links name a PR. A URL cited in the title or body is
+# prose (often the PR that caused the bug), not the work this record tracks.
+# tasks-axi has no separate link field: `--pr` appends the URL to the end of
+# the title, and `show` reports every title PR URL as a `pr:` link. So a link
+# counts only when it sits in the title's trailing run of URLs, or when it is
+# not in the title at all.
+collect_pr_links() {  # <links-field> <title>
+  local links title_all trailing="" rest word url
+  links=$(canonical_pr_urls "$1")
+  [ -n "$links" ] || return 0
+  title_all=$(canonical_pr_urls "$2")
+  rest=${2#\"}
+  rest=${rest%\"}
+  while :; do
+    rest=${rest%"${rest##*[![:space:]]}"}
+    word=${rest##*[[:space:]]}
+    case "$word" in
+      https://*|http://*) trailing="$trailing $word" ;;
+      *) break ;;
+    esac
+    [ "$word" != "$rest" ] || break
+    rest=${rest%"$word"}
+  done
+  trailing=$(canonical_pr_urls "$trailing")
+  while IFS= read -r url; do
+    if id_in_list "$trailing" "$url" || ! id_in_list "$title_all" "$url"; then
+      printf '%s\n' "$url"
+    fi
+  done <<EOF
+$links
+EOF
 }
 
 # Exit 0 merged, 1 not merged, 2 the forge read failed.
@@ -167,7 +199,7 @@ while IFS= read -r id || [ -n "${id:-}" ]; do
   fi
   if [ "$WITH_PR" -eq 1 ]; then
     show=$(fm_backlog_row_show "$DATA_ABS" "$id") || continue
-    urls=$(collect_pr_links "$(show_field "$show" links)")
+    urls=$(collect_pr_links "$(show_field "$show" links)" "$(show_field "$show" title)")
     while IFS= read -r url || [ -n "${url:-}" ]; do
       [ -n "$url" ] || continue
       merged=0
