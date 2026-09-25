@@ -1604,6 +1604,74 @@ test_empty_outcome_still_refuses_open_captain_decision() {
   pass "--empty-outcome still refuses a scout that holds an open captain decision"
 }
 
+# --empty-outcome must refuse a task that has a deliverable, so the closed
+# backlog item never says "produced no deliverable" over real work.
+expect_empty_outcome_deliverable_refusal() {  # <case-dir> <label> <reason>
+  local case_dir=$1 label=$2 reason=$3 rc before
+  before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
+
+  set +e
+  run_teardown "$case_dir" --empty-outcome > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "$label: --empty-outcome must refuse a task with a deliverable"
+  grep -Fq "only for a task that produced no deliverable" "$case_dir/stderr" \
+    || fail "$label: the refusal did not name the deliverable: $(cat "$case_dir/stderr")"
+  grep -Fq "$reason" "$case_dir/stderr" \
+    || fail "$label: the refusal did not cite '$reason': $(cat "$case_dir/stderr")"
+  grep -Fq "without --empty-outcome" "$case_dir/stderr" \
+    || fail "$label: the refusal did not point to ordinary teardown: $(cat "$case_dir/stderr")"
+  [ "$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')" = "$before" ] \
+    || fail "$label: the refusal modified the task record"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "$label: the refusal closed the backlog item anyway"
+  ! grep -Fq "produced no deliverable" "$case_dir/data/backlog.md" \
+    || fail "$label: the refusal recorded an empty outcome on the backlog"
+}
+
+test_empty_outcome_refuses_scout_with_report() {
+  local case_dir
+  case_dir=$(make_case empty-outcome-scout-report)
+  write_meta "$case_dir" no-mistakes scout
+  seed_backlog_in_flight "$case_dir" scout
+  mkdir -p "$case_dir/data/task-x1"
+  printf '%s\n' "# Findings" > "$case_dir/data/task-x1/report.md"
+
+  expect_empty_outcome_deliverable_refusal "$case_dir" empty-outcome-scout-report "its report exists"
+  assert_present "$case_dir/data/task-x1/report.md" \
+    "empty-outcome-scout-report: the refusal removed the report"
+  pass "--empty-outcome refuses a scout whose report exists"
+}
+
+test_empty_outcome_refuses_recorded_pr() {
+  local case_dir
+  case_dir=$(make_case empty-outcome-pr)
+  write_meta "$case_dir" no-mistakes ship
+  seed_backlog_in_flight "$case_dir"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
+
+  expect_empty_outcome_deliverable_refusal "$case_dir" empty-outcome-pr \
+    "it records PR https://github.com/example/repo/pull/7"
+  pass "--empty-outcome refuses a task that records a PR"
+}
+
+test_empty_outcome_refuses_local_only_work_merged_to_main() {
+  local case_dir wt_head
+  case_dir=$(make_case empty-outcome-local-merged)
+  write_meta "$case_dir" local-only ship
+  seed_backlog_in_flight "$case_dir"
+  wt_commit "$case_dir" "merged local work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+
+  expect_empty_outcome_deliverable_refusal "$case_dir" empty-outcome-local-merged \
+    "its local-only work is merged into"
+  assert_present "$case_dir/wt" \
+    "empty-outcome-local-merged: the refusal returned the worktree"
+  pass "--empty-outcome refuses local-only work already merged into local main"
+}
+
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead() {
   local case_dir out
   case_dir=$(make_case legacy-allow)
@@ -4305,6 +4373,9 @@ test_empty_outcome_still_refuses_unlanded_identifiable_worktree
 test_empty_outcome_still_refuses_dirty_identifiable_worktree
 test_empty_outcome_still_refuses_ambiguous_worktree
 test_empty_outcome_still_refuses_open_captain_decision
+test_empty_outcome_refuses_scout_with_report
+test_empty_outcome_refuses_recorded_pr
+test_empty_outcome_refuses_local_only_work_merged_to_main
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead
 test_legacy_record_teardown_refuses_unlanded_work
 test_legacy_record_teardown_refuses_an_ambiguous_endpoint

@@ -174,7 +174,9 @@
 #   closed backlog item, without --force and without writing a scout report.
 #   It still refuses unlanded work, an identifiable worktree with uncommitted
 #   changes, an ambiguous worktree identity, an open captain decision, and
-#   secondmate retirement. A missing or empty worktree= line is no identity;
+#   secondmate retirement. It refuses a task that has a deliverable (a scout
+#   report, a recorded pr=, or local-only work merged into local main); plain
+#   teardown closes those. A missing or empty worktree= line is no identity;
 #   two worktree= lines stay ambiguous and are refused. An Orca record that
 #   still names orca_worktree_id is identifiable and is refused rather than
 #   skipped. --legacy-record remains the path for records that predate
@@ -1168,6 +1170,19 @@ if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
 fi
 HOME_PATH=$(grep '^home=' "$META" | cut -d= -f2- || true)
 PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
+empty_outcome_deliverable_refusal() {
+  echo "REFUSED: --empty-outcome is only for a task that produced no deliverable, but task $ID has one: $1." >&2
+  echo "Tear it down without --empty-outcome (bin/fm-teardown.sh $ID) so the backlog records that deliverable." >&2
+}
+if [ "$EMPTY_OUTCOME_GIVEN" = 1 ]; then
+  if [ "$TEARDOWN_META_KIND" = scout ] && [ -f "$DATA/$ID/report.md" ]; then
+    empty_outcome_deliverable_refusal "its report exists at $DATA/$ID/report.md"
+    exit 1
+  elif [ -n "$PR_URL" ]; then
+    empty_outcome_deliverable_refusal "it records PR $PR_URL"
+    exit 1
+  fi
+fi
 # tasktmp is recorded by fm-spawn for tasks that set up a per-task temp root
 # (/tmp/fm-<id>/); absent for tasks spawned before that change, so tolerate empty.
 TASK_TMP=$(grep '^tasktmp=' "$META" | cut -d= -f2- || true)
@@ -1650,14 +1665,7 @@ backlog_done_args() {
   local data_relative
   BACKLOG_DONE_ARGS=()
   if [ "$EMPTY_OUTCOME_GIVEN" = 1 ]; then
-    if [ "$KIND" = scout ] && [ -f "$DATA/$ID/report.md" ]; then
-      data_relative=$(fm_backlog_data_relative "$DATA") || return 1
-      BACKLOG_DONE_ARGS=(--report "$data_relative/$ID/report.md")
-    elif [ -n "$PR_URL" ]; then
-      BACKLOG_DONE_ARGS=(--pr "$PR_URL")
-    else
-      BACKLOG_DONE_ARGS=(--note "$EMPTY_OUTCOME_NOTE")
-    fi
+    BACKLOG_DONE_ARGS=(--note "$EMPTY_OUTCOME_NOTE")
     return 0
   fi
   case "$KIND" in
@@ -1966,6 +1974,10 @@ validate_worktree_teardown_safety() {
       [ -n "$dirty" ] && echo "uncommitted changes present" >&2
       [ -n "$unmerged" ] && printf 'commits not yet on %s:\n%s\n' "$DEFAULT" "$unmerged" >&2
       echo "Merge the branch into local $DEFAULT first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force." >&2
+      return 1
+    fi
+    if [ "$EMPTY_OUTCOME_GIVEN" = 1 ]; then
+      empty_outcome_deliverable_refusal "its local-only work is merged into $DEFAULT"
       return 1
     fi
   elif [ -n "$dirty" ]; then
@@ -3665,7 +3677,8 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   # the project. teardown_treehouse_return tolerates transient and stale git locks
   # left by a killed crew process; see the script header for retry and stale-lock proof.
   post_lock_cleanup_check=
-  if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
+  if [ "$FORCE" != "--force" ] && [ "$KIND" != secondmate ] \
+      && { [ "$KIND" != scout ] || [ "$EMPTY_OUTCOME_GIVEN" = 1 ]; }; then
     post_lock_cleanup_check=validate_worktree_teardown_safety
   fi
   teardown_treehouse_return "$WT" "$PROJ" "worktree" "$post_lock_cleanup_check" || {
