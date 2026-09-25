@@ -1,0 +1,7 @@
+$ PATH-without-gh bin/fm-queued-recheck.sh --with-pr   (forge read fails)
+gh: not on PATH
+scout-done	report	data/scout-done/report.md
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+rc=0
+$ cat state/.queued-recheck-pr   (previous merged line kept)
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554

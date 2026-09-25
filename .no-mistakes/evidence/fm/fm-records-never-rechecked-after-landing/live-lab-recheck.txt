@@ -1,0 +1,197 @@
+## Setup: lab home with real tasks-axi records
+ok: added scout-done (scout) -> Queued
+task:
+  id: scout-done
+  title: Scout whose report exists
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start scout-done` to move it to in flight
+  - Run `tasks-axi block scout-done --by <other>` to record a dependency
+ok: added merged-pr-work (ship) -> Queued
+task:
+  id: merged-pr-work
+  title: "Work tracked by a merged PR https://github.com/kunchenguid/firstmate/pull/5554"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: "pr:https://github.com/kunchenguid/firstmate/pull/5554"
+  body: ""
+help[2]:
+  - Run `tasks-axi start merged-pr-work` to move it to in flight
+  - Run `tasks-axi block merged-pr-work --by <other>` to record a dependency
+ok: added open-pr-work (ship) -> Queued
+task:
+  id: open-pr-work
+  title: "Work tracked by an open PR https://github.com/kunchenguid/firstmate/pull/5652"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: "pr:https://github.com/kunchenguid/firstmate/pull/5652"
+  body: ""
+help[2]:
+  - Run `tasks-axi start open-pr-work` to move it to in flight
+  - Run `tasks-axi block open-pr-work --by <other>` to record a dependency
+ok: added body-cite (ship) -> Queued
+task:
+  id: body-cite
+  title: Regression cleanup
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: none
+  body: "Regression from https://github.com/kunchenguid/firstmate/pull/5554 yesterday."
+help[2]:
+  - Run `tasks-axi start body-cite` to move it to in flight
+  - Run `tasks-axi block body-cite --by <other>` to record a dependency
+ok: added held-scout (scout) -> Queued
+task:
+  id: held-scout
+  title: Held scout
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start held-scout` to move it to in flight
+  - Run `tasks-axi block held-scout --by <other>` to record a dependency
+ok: hold held-scout -> held (captain)
+task:
+  id: held-scout
+  title: Held scout
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: captain deciding
+  hold_kind: captain
+  hold_until: "-"
+  kind: scout
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold held-scout` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+ok: added broken-forge (ship) -> Queued
+task:
+  id: broken-forge
+  title: "Names a PR on a missing repo https://github.com/kunchenguid/no-such-repo-zz/pull\n... (truncated, 82 chars total - use show broken-forge --full to see complete text)"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-09-25
+  closed: "-"
+  deps: none
+  links: "pr:https://github.com/kunchenguid/no-such-repo-zz/pull/1"
+  body: ""
+help[2]:
+  - Run `tasks-axi start broken-forge` to move it to in flight
+  - Run `tasks-axi block broken-forge --by <other>` to record a dependency
+
+## 1) --local (no forge call) before any forge scan
+scout-done	report	data/scout-done/report.md
+rc=0
+
+## 2) --with-pr --section (real gh reads)
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+merged-pr-work named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+cache:
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+## 3) real wake drain after the forge scan
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+merged-pr-work named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+
+## 4) forge failure keeps prior cache line: seed cache for broken-forge, re-run --with-pr
+scout-done	report	data/scout-done/report.md
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+broken-forge	pr	https://github.com/kunchenguid/no-such-repo-zz/pull/1
+rc=0
+cache:
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+broken-forge	pr	https://github.com/kunchenguid/no-such-repo-zz/pull/1
+
+## 5) records still queued, report files still present
+count: 6
+tasks[6]{id,state,kind,repo,title}:
+  scout-done,queued,scout,"-",Scout whose report exists
+  merged-pr-work,queued,ship,"-","Work tracked by a merged PR https://github.com/kunchenguid/firstmate/pull/5554"
+  open-pr-work,queued,ship,"-","Work tracked by an open PR https://github.com/kunchenguid/firstmate/pull/5652"
+  body-cite,queued,ship,"-",Regression cleanup
+  held-scout,queued,scout,"-",Held scout
+  broken-forge,queued,ship,"-","Names a PR on a missing repo https://github.com/kunchenguid/no-such-repo-zz/pull\n... (truncated, 82 chars total - use show broken-forge --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show <id>` for full notes on a task
+-rw-rw-r-- 1 berke berke 11 Sep 25 10:53 /tmp/fm-lab.2ENach/data/scout-done/report.md

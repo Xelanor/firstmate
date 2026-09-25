@@ -1,0 +1,25 @@
+## 6) title-only merged PR URL (no pr: link) stays silent
+1
+(0 = silent)
+
+## 7) real startup-network stage, locked 0, real bootstrap + real gh
+
+real	0m3.641s
+user	0m0.823s
+sys	0m0.395s
+rc=0
+--- report:
+completed off the startup path in 3s: GitHub authentication.
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+QUEUED_RECHECK_INFO: scout-done declared report exists at data/scout-done/report.md
+QUEUED_RECHECK_INFO: merged-pr-work named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: broken-forge named PR https://github.com/kunchenguid/no-such-repo-zz/pull/1 has merged
+QUEUED_RECHECK_INFO: title-cite named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+102     elapsed=350
+  stage       network-checks probe                       start=+49      elapsed=3435
+  slowest: stage network-checks probe 3435ms, phase gh-auth 350ms
+--- wake queue:
+(no wake queue file)

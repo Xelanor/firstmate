@@ -1,0 +1,79 @@
+## Setup (real tasks-axi, lab home /tmp/fm-lab.AiCO6F)
+## In flight
+
+## Queued
+- [ ] scout-done - Scout whose report exists (kind: scout) (since 2026-09-25)
+
+- [ ] merged-pr-work - Work tracked by a merged PR https://github.com/kunchenguid/firstmate/pull/5554 (kind: ship) (since 2026-09-25)
+- [ ] open-pr-work - Work tracked by an open PR https://github.com/kunchenguid/firstmate/pull/5652 (kind: ship) (since 2026-09-25)
+- [ ] body-cite - Regression cleanup (kind: ship) (since 2026-09-25)
+  Regression from https://github.com/kunchenguid/firstmate/pull/5554 yesterday.
+- [ ] held-scout - Held scout (kind: scout) (since 2026-09-25) (hold: captain deciding) (hold-kind: captain)
+- [ ] title-cite - Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout (kind: ship) (since 2026-09-25)
+- [ ] broken-forge - Names a PR on a missing repo https://github.com/kunchenguid/no-such-repo-zz/pull/1 (kind: ship) (since 2026-09-25)
+## Done
+-- show merged-pr-work links:
+  title: "Work tracked by a merged PR https://github.com/kunchenguid/firstmate/pull/5554"
+  links: "pr:https://github.com/kunchenguid/firstmate/pull/5554"
+  body: ""
+-- show body-cite links:
+  title: Regression cleanup
+  links: none
+  body: "Regression from https://github.com/kunchenguid/firstmate/pull/5554 yesterday."
+-- show title-cite links:
+  title: "Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout"
+  links: "pr:https://github.com/kunchenguid/firstmate/pull/5554"
+  body: ""
+
+## A) --local before any forge scan (no gh call)
+scout-done	report	data/scout-done/report.md
+rc=0
+
+## B) --with-pr --section (real gh reads)
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+merged-pr-work named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+title-cite named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+cache:
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+## C) real wake drain after the forge scan
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+merged-pr-work named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+title-cite named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+
+## D) forge failure keeps prior cache: seed broken-forge line, re-run --with-pr
+scout-done	report	data/scout-done/report.md
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+broken-forge	pr	https://github.com/kunchenguid/no-such-repo-zz/pull/1
+rc=0
+cache:
+merged-pr-work	pr	https://github.com/kunchenguid/firstmate/pull/5554
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+broken-forge	pr	https://github.com/kunchenguid/no-such-repo-zz/pull/1
+
+## E) close merged-pr-work -> line disappears from local drain
+scout-done	report	data/scout-done/report.md
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+broken-forge	pr	https://github.com/kunchenguid/no-such-repo-zz/pull/1
+rc=0
+
+## F) records untouched: still queued, reports still on disk
+count: 6
+tasks[6]{id,state,kind,repo,title}:
+  scout-done,queued,scout,"-",Scout whose report exists
+  open-pr-work,queued,ship,"-","Work tracked by an open PR https://github.com/kunchenguid/firstmate/pull/5652"
+  body-cite,queued,ship,"-",Regression cleanup
+  held-scout,queued,scout,"-",Held scout
+  title-cite,queued,ship,"-","Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout"
+  broken-forge,queued,ship,"-","Names a PR on a missing repo https://github.com/kunchenguid/no-such-repo-zz/pull\n... (truncated, 82 chars total - use show broken-forge --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show <id>` for full notes on a task
+-rw-rw-r-- 1 berke berke 11 Sep 25 10:57 /tmp/fm-lab.AiCO6F/data/scout-done/report.md

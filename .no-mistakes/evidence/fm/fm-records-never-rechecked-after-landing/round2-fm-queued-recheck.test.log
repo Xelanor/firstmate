@@ -1,0 +1,12 @@
+ok - queued report on disk surfaces and the record stays queued
+ok - queued record without a report stays silent
+ok - in-flight report is not a queued re-check
+ok - held queued report stays off the re-check list
+ok - symlink report is ignored
+ok - merged named PR surfaces with --with-pr and stays queued
+ok - open named PR stays silent
+ok - body PR URL is not a named PR
+ok - a failed forge read keeps the previous merged-PR cache line
+ok - merged-PR cache lets a later local scan skip the forge
+ok - section copy states that nothing is closed or removed
+ok - drain prints the queued-report warning and leaves the record queued

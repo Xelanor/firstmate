@@ -1,0 +1,6 @@
+$ FM_HOME=$LAB bin/fm-wake-drain.sh
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0

@@ -1,0 +1,43 @@
+$ bin/fm-startup-network.sh report
+completed off the startup path in 5s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+QUEUED_RECHECK_INFO: scout-done declared report exists at data/scout-done/report.md
+QUEUED_RECHECK_INFO: pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+404     elapsed=334
+  phase       secondmate-liveness                        start=+750     elapsed=4
+  phase       secondmate-sync                            start=+759     elapsed=17
+  phase       handoff-delivery                           start=+781     elapsed=1
+  phase       fleet-sync                                 start=+746     elapsed=1010
+  stage       network-checks probe_sweeps                start=+52      elapsed=4274
+  slowest: stage network-checks probe_sweeps 4274ms, phase fleet-sync 1010ms, phase gh-auth 334ms
+
+$ cat state/.startup-network.report
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+QUEUED_RECHECK_INFO: scout-done declared report exists at data/scout-done/report.md
+QUEUED_RECHECK_INFO: pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+
+$ cat state/.queued-recheck-pr
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+$ wake queue files mentioning startup-network
+.
+..
+.guard-watcher-stale-banner
+.inactive-outcome-reconcile
+.lock
+.lock-session
+.queued-recheck-pr
+.session-start-complete
+.startup-network.report
+.startup-network.status
+.startup-network.timings
+.trace-context-effective
+.wake-queue
+contributions.check-trust
+contributions.check.sh
+home-summary.json
+terminal-outcomes

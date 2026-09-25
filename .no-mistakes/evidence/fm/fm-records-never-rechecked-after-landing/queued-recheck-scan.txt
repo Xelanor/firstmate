@@ -1,0 +1,39 @@
+$ FM_HOME=$LAB bin/fm-queued-recheck.sh --local   (before any forge scan)
+scout-done	report	data/scout-done/report.md
+rc=0
+
+$ FM_HOME=$LAB bin/fm-queued-recheck.sh --with-pr --section
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+
+$ cat $LAB/state/.queued-recheck-pr
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+-rw-------
+
+$ FM_HOME=$LAB bin/fm-queued-recheck.sh --local --section   (later drain, no forge)
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+
+$ tasks-axi list --state queued   (nothing closed)
+count: 8
+tasks[8]{id,state,kind,repo,title}:
+  scout-done,queued,task,"-",scout audit whose report already landed
+  scout-open,queued,task,"-",scout audit not started yet
+  held-done,queued,task,"-",held scout with report on disk
+  pr-merged,queued,task,"-","fix thing https://github.com/kunchenguid/firstmate/pull/5554"
+  pr-open,queued,task,"-","fix other thing https://github.com/kunchenguid/firstmate/pull/5653"
+  title-cite,queued,task,"-","Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout"
+  long-cite,queued,task,"-","Regression from https://github.com/kunchenguid/firstmate/pull/5554 where the wak\n... (truncated, 134 chars total - use show long-cite --full to see complete text)"
+  body-cite,queued,task,"-",fix regression
+help[1]:
+  - Run `tasks-axi show <id> --file=/tmp/fm-lab.iOQeWs/data/backlog.md` for full notes on a task
+$ ls data/*/report.md   (no report removed)
+data/held-done/report.md
+data/inflight-done/report.md
+data/scout-done/report.md

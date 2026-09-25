@@ -1,0 +1,52 @@
+## G) real startup-network stage (real bootstrap + real gh), clean bootstrap with re-check lines
+
+real	0m3.145s
+user	0m0.757s
+sys	0m0.388s
+rc=0
+--- report:
+completed off the startup path in 3s: GitHub authentication.
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+QUEUED_RECHECK_INFO: scout-done declared report exists at data/scout-done/report.md
+QUEUED_RECHECK_INFO: title-cite named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+118     elapsed=359
+  stage       network-checks probe                       start=+52      elapsed=2938
+  slowest: stage network-checks probe 2938ms, phase gh-auth 359ms
+--- wake queue files:
+(none)
+--- cache refreshed:
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+## H) slow forge: gh shim sleeps 60s, stage budget 8s -> stage still 'done', not timeout
+rc=0 elapsed=9s
+completed off the startup path in 9s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+105     elapsed=362
+  stage       network-checks probe                       start=+49      elapsed=8641
+  slowest: stage network-checks probe 8641ms, phase gh-auth 362ms
+--- cache after slow forge (kept lines expected: none lost):
+title-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+## I) re-run G with gh normal; raw report file + wake queue (clean bootstrap + QUEUED_RECHECK_INFO must not queue a wake)
+rc=0
+--- raw state/.startup-network.report:
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+QUEUED_RECHECK_INFO: scout-done declared report exists at data/scout-done/report.md
+QUEUED_RECHECK_INFO: title-cite named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+QUEUED_RECHECK_INFO: STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+--- status:
+state=done
+pid=33348
+started=1790323133
+finished=1790323136
+rc=0
+locked=0
+phases=probe
+generation=1790323133.33348.manual
+lock_pid=
+report_published=1
+--- state/.wake-queue bytes: 0

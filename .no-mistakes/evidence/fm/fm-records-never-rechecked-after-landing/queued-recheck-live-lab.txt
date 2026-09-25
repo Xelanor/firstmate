@@ -1,0 +1,73 @@
+# Live lab: real tasks-axi 0.2.6 + real gh against github.com/kunchenguid/firstmate
+# PR 5554 = MERGED, PR 5652 = OPEN (gh pr view)
+
+$ cat data/backlog.md
+## In flight
+
+## Queued
+- [ ] scout-done - Scout whose report already exists (kind: scout) (since 2026-09-25)
+
+- [ ] pr-merged - Ship work tracked by merged PR https://github.com/kunchenguid/firstmate/pull/5554 (kind: ship) (since 2026-09-25)
+- [ ] pr-open - Ship work tracked by open PR https://github.com/kunchenguid/firstmate/pull/5652 (kind: ship) (since 2026-09-25)
+- [ ] title-cite - Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout (kind: task) (since 2026-09-25)
+- [ ] body-cite - Regression follow-up (kind: task) (since 2026-09-25)
+  regression from https://github.com/kunchenguid/firstmate/pull/5554
+- [ ] mixed - Fix after https://github.com/kunchenguid/firstmate/pull/5554 lands https://github.com/kunchenguid/firstmate/pull/5652 (kind: ship) (since 2026-09-25)
+- [ ] held-scout - Held scout (kind: scout) (since 2026-09-25) (hold: captain deciding) (hold-kind: captain)
+- [ ] still-open - Genuinely open work (kind: task) (since 2026-09-25)
+- [ ] long-cite - Follow-up regression fallout from https://github.com/kunchenguid/firstmate/pull/5554 still needs a proper fix (kind: task) (since 2026-09-25)
+## Done
+
+$ bin/fm-queued-recheck.sh --with-pr
+scout-done	report	data/scout-done/report.md
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+rc=0
+
+$ cat state/.queued-recheck-pr
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+# Forge failure: invalid GH_TOKEN makes the real gh read fail
+$ GH_TOKEN=bogus bin/fm-queued-recheck.sh --with-pr
+scout-done	report	data/scout-done/report.md
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+rc=0
+$ cat state/.queued-recheck-pr
+pr-merged	pr	https://github.com/kunchenguid/firstmate/pull/5554
+
+$ bin/fm-wake-drain.sh
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+rc=0
+
+$ tasks-axi list --state queued (after drain)
+count: 9
+tasks[9]{id,state,kind,repo,title}:
+  scout-done,queued,scout,"-",Scout whose report already exists
+  pr-merged,queued,ship,"-","Ship work tracked by merged PR https://github.com/kunchenguid/firstmate/pull/555\n... (truncated, 81 chars total - use show pr-merged --full to see complete text)"
+  pr-open,queued,ship,"-","Ship work tracked by open PR https://github.com/kunchenguid/firstmate/pull/5652"
+  title-cite,queued,task,"-","Follow-up to https://github.com/kunchenguid/firstmate/pull/5554 fallout"
+  body-cite,queued,task,"-",Regression follow-up
+  mixed,queued,ship,"-","Fix after https://github.com/kunchenguid/firstmate/pull/5554 lands https://githu\n... (truncated, 117 chars total - use show mixed --full to see complete text)"
+  held-scout,queued,scout,"-",Held scout
+  still-open,queued,task,"-",Genuinely open work
+  long-cite,queued,task,"-","Follow-up regression fallout from https://github.com/kunchenguid/firstmate/pull/\n... (truncated, 109 chars total - use show long-cite --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show <id>` for full notes on a task
+
+$ ls data/scout-done
+report.md
+$ bin/fm-tasks-axi.sh done pr-merged
+ok: done pr-merged -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+$ bin/fm-queued-recheck.sh --local --section
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+
+# Before the --full fix (base commit 7167a07), the same lab with the long-cite record reported:
+long-cite	pr	https://github.com/kunchenguid/firstmate/pull/5554
+# because tasks-axi show cut the 109-char title at 80 chars, inside the cited URL.

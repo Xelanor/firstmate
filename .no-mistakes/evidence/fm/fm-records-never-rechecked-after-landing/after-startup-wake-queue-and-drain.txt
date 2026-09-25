@@ -1,0 +1,22 @@
+$ cat state/.startup-network.status
+state=done
+pid=85560
+started=1790323493
+finished=1790323498
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1790323493.85016.82247
+lock_pid=564
+report_published=1
+
+$ ls -la state/.wake-queue
+-rw-rw-r-- 1 berke berke 0 Sep 25 11:04 /tmp/fm-lab.qj54X1/state/.wake-queue
+--- /tmp/fm-lab.qj54X1/state/.wake-queue
+
+$ bin/fm-wake-drain.sh  (next drain after startup refreshed the PR cache)
+STILL-TRUE RE-CHECK (queued records whose named work already landed - nothing was closed automatically):
+scout-done declared report exists at data/scout-done/report.md
+pr-merged named PR https://github.com/kunchenguid/firstmate/pull/5554 has merged
+STILL-TRUE RE-CHECK: confirm each record is still true in two lines, or close it through the ordinary landed-work path. Nothing here removes a record.
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
