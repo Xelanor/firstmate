@@ -175,8 +175,7 @@
 #   It still refuses unlanded work, an identifiable worktree with uncommitted
 #   changes, an ambiguous worktree identity, an open captain decision, and
 #   secondmate retirement. It refuses a task that has a deliverable (a scout
-#   report, a recorded pr=, or local-only work merged into local main); plain
-#   teardown closes those. A missing or empty worktree= line is no identity;
+#   report or a recorded pr=); plain teardown closes those. A missing or empty worktree= line is no identity;
 #   two worktree= lines stay ambiguous and are refused. An Orca record that
 #   still names orca_worktree_id is identifiable and is refused rather than
 #   skipped. --legacy-record remains the path for records that predate
@@ -1974,10 +1973,6 @@ validate_worktree_teardown_safety() {
       [ -n "$dirty" ] && echo "uncommitted changes present" >&2
       [ -n "$unmerged" ] && printf 'commits not yet on %s:\n%s\n' "$DEFAULT" "$unmerged" >&2
       echo "Merge the branch into local $DEFAULT first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force." >&2
-      return 1
-    fi
-    if [ "$EMPTY_OUTCOME_GIVEN" = 1 ]; then
-      empty_outcome_deliverable_refusal "its local-only work is merged into $DEFAULT"
       return 1
     fi
   elif [ -n "$dirty" ]; then

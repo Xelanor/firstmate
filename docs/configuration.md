@@ -489,7 +489,7 @@ Missing, empty, duplicate, malformed, backend-inconsistent, or task-mismatched e
 `--empty-outcome` is the supported close when a task ran and produced no deliverable, including a spawned record with no worktree identity.
 It records why on the closed backlog item without `--force` and without writing a scout report.
 It still refuses unlanded work, an identifiable dirty copy, an ambiguous worktree identity, and an open captain decision.
-It also refuses a task that has a deliverable: a scout report, a recorded PR, or local-only work merged into local main.
+It also refuses a task that has a deliverable: a scout report or a recorded PR.
 Close those with ordinary teardown.
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.

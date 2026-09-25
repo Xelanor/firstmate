@@ -1656,20 +1656,26 @@ test_empty_outcome_refuses_recorded_pr() {
   pass "--empty-outcome refuses a task that records a PR"
 }
 
-test_empty_outcome_refuses_local_only_work_merged_to_main() {
-  local case_dir wt_head
-  case_dir=$(make_case empty-outcome-local-merged)
+test_empty_outcome_clears_local_only_task_while_local_main_is_ahead() {
+  local case_dir wt_head out
+  case_dir=$(make_case empty-outcome-local-ahead)
   write_meta "$case_dir" local-only ship
   seed_backlog_in_flight "$case_dir"
-  wt_commit "$case_dir" "merged local work"
+  # Earlier local-only work sits on local main but not on the remote, and this
+  # task spawned from that main and committed nothing of its own.
+  wt_commit "$case_dir" "earlier task merged into local main"
   wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
 
-  expect_empty_outcome_deliverable_refusal "$case_dir" empty-outcome-local-merged \
-    "its local-only work is merged into"
-  assert_present "$case_dir/wt" \
-    "empty-outcome-local-merged: the refusal returned the worktree"
-  pass "--empty-outcome refuses local-only work already merged into local main"
+  out=$(run_teardown "$case_dir" --empty-outcome 2>"$case_dir/stderr") \
+    || fail "empty-outcome-local-ahead: --empty-outcome refused a local-only task whose main is ahead of the remote: $(cat "$case_dir/stderr")"
+  printf '%s\n' "$out" | grep -Fq "empty outcome: produced no deliverable" \
+    || fail "empty-outcome-local-ahead: the teardown line did not name the empty outcome: $out"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "empty-outcome-local-ahead: teardown returned success with its backlog item still open"
+  assert_grep "produced no deliverable" "$case_dir/data/backlog.md" \
+    "empty-outcome-local-ahead: the closed item did not keep a durable empty-outcome trace"
+  pass "--empty-outcome clears a local-only task while local main is ahead of the remote"
 }
 
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead() {
@@ -4375,7 +4381,7 @@ test_empty_outcome_still_refuses_ambiguous_worktree
 test_empty_outcome_still_refuses_open_captain_decision
 test_empty_outcome_refuses_scout_with_report
 test_empty_outcome_refuses_recorded_pr
-test_empty_outcome_refuses_local_only_work_merged_to_main
+test_empty_outcome_clears_local_only_task_while_local_main_is_ahead
 test_legacy_record_teardown_completes_when_landed_and_endpoint_dead
 test_legacy_record_teardown_refuses_unlanded_work
 test_legacy_record_teardown_refuses_an_ambiguous_endpoint
